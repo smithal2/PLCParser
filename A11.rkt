@@ -35,13 +35,20 @@
 
 ; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
 
+(define symList? 
+ (lambda (lst) 
+    (if (null? lst) #t)
+    (if (symbol? (car lst) (symList? (cdr lst) 
+    #f 
+  )))))
+
 (define-datatype expression expression?
   [var-exp
    (id symbol?)]
   [lit-exp
    (data number?)]
   [lambda-exp
-   (id symbol?)
+   (id symList?)
    (body expression?)]
   [app-exp
    (rator expression?)
@@ -60,7 +67,7 @@
       [(pair? datum)
        (cond
          [(eqv? (car datum) 'lambda)
-          (lambda-exp (car (2nd  datum))
+          (lambda-exp (2nd  datum))
                       (parse-exp (3rd datum)))]
          [else (app-exp (parse-exp (1st datum))
                         (parse-exp (2nd datum)))])]
