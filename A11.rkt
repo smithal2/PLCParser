@@ -66,9 +66,7 @@
       [(number? datum) (lit-exp datum)]
       [(pair? datum)
        (cond
-         [(eqv? (car datum) 'lambda)
-          (lambda-exp (2nd  datum))
-                      (parse-exp (3rd datum)))]
+         [(eqv? (car datum) 'lambda) (lambda-exp (2nd  datum) (parse-exp (3rd datum)))]
          [else (app-exp (parse-exp (1st datum))
                         (parse-exp (2nd datum)))])]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
