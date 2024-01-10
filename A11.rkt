@@ -78,8 +78,8 @@
       [(number? datum) (lit-exp datum)]
       [(pair? datum)
        (cond
-         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (lambda-exp (2nd  datum) (parse-exp (3rd datum))) (error 'parse-exp "not enough bodies in lambda exp" datum))]
-         [(eqv? (car datum) 'let) (let-exp (2nd datum) (parse-exp (3rd datum)))]
+         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (symList? (2nd datum)) (lambda-exp (2nd  datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
+         [(eqv? (car datum) 'let) (if (= 2 (length datum)) (let-exp (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum))))]
          [else (app-exp (parse-exp (1st datum))
                         (parse-exp (2nd datum)))])]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
