@@ -25,10 +25,9 @@
                  datum])))
                 
 ; Here's the one you need to solve
-(define (bintree-add bt num)
-  (if (equal? (car bt) 'leaf-node)
-      (leaf-node (+ (cadr bt) num))
-      (interior-node (cadr bt) (bintree-add (caddr bt) num) (bintree-add (cadddr bt) num))))
+(define bintree-add
+  (lambda (bt num)
+    (nyi)))
 
 ; This is a parser for simple Scheme expressions, 
 ; such as those in EOPL, 3.1 thru 3.3.
