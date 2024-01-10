@@ -37,10 +37,19 @@
 
 (define symList? 
  (lambda (lst) 
-    (if (null? lst) #t)
-    (if (symbol? (car lst) (symList? (cdr lst) 
+    (if (null? lst) #t
+    (if (symbol? (car lst)) (symList? (cdr lst)) 
     #f 
-  )))))
+  ))))
+
+(define letBasicAssignment?
+  (lambda (lst)
+    (if (null? lst) #t
+    (if (not (list? lst)) #f
+    (if (not (> (length lst) 1)) #f
+    (if (not (symbol? (car lst))) #f
+    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
+  )))))))
 
 (define-datatype expression expression?
   [var-exp
@@ -49,6 +58,9 @@
    (data number?)]
   [lambda-exp
    (id symList?)
+   (body expression?)]
+  [let-exp 
+   (assignment letBasicAssignment?)
    (body expression?)]
   [app-exp
    (rator expression?)
@@ -66,7 +78,8 @@
       [(number? datum) (lit-exp datum)]
       [(pair? datum)
        (cond
-         [(eqv? (car datum) 'lambda) (lambda-exp (2nd  datum) (parse-exp (3rd datum)))]
+         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (lambda-exp (2nd  datum) (parse-exp (3rd datum))) (error 'parse-exp "not enough bodies in lambda exp" datum))]
+         [(eqv? (car datum) 'let) (let-exp (2nd datum) (parse-exp (3rd datum)))]
          [else (app-exp (parse-exp (1st datum))
                         (parse-exp (2nd datum)))])]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
