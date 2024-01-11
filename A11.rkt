@@ -93,7 +93,7 @@
     (cond
       [(symbol? datum) (var-exp datum)]
       [(number? datum) (lit-exp datum)]
-      [(pair? datum)
+      [(list? datum)
        (cond
          [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
          [(eqv? (car datum) 'let) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
