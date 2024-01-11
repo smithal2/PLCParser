@@ -36,34 +36,48 @@
 ; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
 
 (define symList? 
- (lambda (lst) 
+  (lambda (lst) 
     (if (null? lst) #t
-    (if (symbol? (car lst)) (symList? (cdr lst)) 
-    #f 
-  ))))
+        (if (symbol? (car lst)) (symList? (cdr lst)) 
+            #f 
+            ))))
 
 (define letBasicAssignment?
   (lambda (lst)
     (if (null? lst) #t
-    (if (not (list? lst)) #f
-    (if (not (> (length lst) 1)) #f
-    (if (not (symbol? (car lst))) #f
-    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
-  )))))))
+        (if (not (list? lst)) #f
+            (if (not (> (length lst) 1)) #f
+                (if (not (symbol? (car lst))) #f
+                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
+                        )))))))
+
+(define (lit-exp? data)
+  (or (number? data)
+      (string? data)
+      (symbol? data)
+      (boolean? data)
+      (and (list? data) (equal? (car data) 'quote))))
 
 (define-datatype expression expression?
   [var-exp
    (id symbol?)]
   [lit-exp
-   (data number?)]
+   (data lit-exp?)]
   [lambda-exp
    (id symList?)
    (body expression?)]
-   [let-exp-wo-body
+  [let-exp-wo-body
    (assignment letBasicAssignment?)]
   [let-exp 
    (assignment letBasicAssignment?)
    (body expression?)]
+  [if-exp
+   (condition expression?)
+   (true expression?)
+   (false expression?)]
+  [set-exp
+   (id var-exp?)
+   (value expression?)]
   [app-exp
    (rator expression?)
    (rand expression?)])
@@ -72,6 +86,7 @@
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
+(define 4th cadddr)
 
 (define parse-exp         
   (lambda (datum)
@@ -80,8 +95,10 @@
       [(number? datum) (lit-exp datum)]
       [(pair? datum)
        (cond
-         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (symList? (2nd datum)) (lambda-exp (2nd  datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-         [(eqv? (car datum) 'let) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum)) ]
+         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
+         [(eqv? (car datum) 'let) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+         [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
+         [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
          [else (app-exp (parse-exp (1st datum))
                         (parse-exp (2nd datum)))])]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
