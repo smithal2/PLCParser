@@ -96,16 +96,25 @@
       [(list? datum)
        (cond
          [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-         [(eqv? (car datum) 'let) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+         [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
          [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
          [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
          [else (app-exp (parse-exp (1st datum))
-                        (parse-exp (2nd datum)))])]
+                        (parse-exp (cdr datum)))])]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
 
 (define unparse-exp
   (lambda (exp)
-    (nyi)))
+    (cases expression exp
+      [var-exp (id) id]
+      [lit-exp (id) id]
+      [lambda-exp (id body)
+                (list 'lambda id (unparse-exp body))]
+      [let-exp-wo-body (assignment) (list 'let assignment)]
+      [let-exp (assignment body) (list 'let assignment (unparse-exp body))]
+      [if-exp (condition true false) (list 'if (list (unparse-exp condition)) (unparse-exp true) (unparse-exp false) )]
+      [set-exp (id value) (list 'set! (unparse-exp id) (unparse-exp value))]
+      [app-exp (rator rand) (list (unparse-exp rator) (unparse-exp rand))])))
 
 ; An auxiliary procedure that could be helpful.
 (define var-exp?
