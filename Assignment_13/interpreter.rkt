@@ -12,20 +12,57 @@
 ; parsed expression.  You'll probably want to replace this 
 ; code with your expression datatype from A11b
 
-(define-datatype expression expression?  
-  [var-exp        ; variable references
+(define symList? 
+  (lambda (lst) 
+    (if (null? lst) #t
+        (if (symbol? (car lst)) (symList? (cdr lst)) 
+            #f 
+            ))))
+
+(define letBasicAssignment?
+  (lambda (lst)
+    (if (null? lst) #t
+        (if (not (list? lst)) #f
+            (if (not (> (length lst) 1)) #f
+                (if (not (symbol? (car lst))) #f
+                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
+                        )))))))
+
+(define (lit-exp? data)
+  (lambda (x)
+    (ormap 
+     (lambda (pred) (pred x))
+     (list number? vector? boolean? symbol? string? pair? null?))))
+
+(define var-exp?
+  (lambda (x)
+    (cases expression x
+      [var-exp (id) #t]
+      [else #f])))
+
+(define-datatype expression expression?
+  [var-exp
    (id symbol?)]
-  [lit-exp        ; "Normal" data.  Did I leave out any types?
-   (datum
-    (lambda (x)
-      (ormap 
-       (lambda (pred) (pred x))
-       (list number? vector? boolean? symbol? string? pair? null?))))]
-  [app-exp        ; applications
+  [lit-exp
+   (data lit-exp?)]
+  [lambda-exp
+   (id symList?)
+   (body expression?)]
+  [let-exp-wo-body
+   (assignment letBasicAssignment?)]
+  [let-exp 
+   (assignment letBasicAssignment?)
+   (body expression?)]
+  [if-exp
+   (condition expression?)
+   (true expression?)
+   (false expression?)]
+  [set-exp
+   (id var-exp?)
+   (value expression?)]
+  [app-exp
    (rator expression?)
-   (rands (list-of? expression?))]  
-  )
-	
+   (rand expression?)])
 
 ;; environment type definitions
 
@@ -62,6 +99,7 @@
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
+(define 4th cadddr)
 
 ; Again, you'll probably want to use your code from A11b
 
@@ -192,16 +230,54 @@
 (define apply-prim-proc
   (lambda (prim-proc args)
     (case prim-proc
-      [(+) (+ (1st args) (2nd args))]
-      [(-) (- (1st args) (2nd args))]
-      [(*) (* (1st args) (2nd args))]
+      [(+) (apply + args)]
+      [(-) (apply - args)]
+      [(*) (apply * args)]
+      [(/) (apply / args)]
       [(add1) (+ (1st args) 1)]
       [(sub1) (- (1st args) 1)]
+      [(zero?) (zero? (1st args))]
+      [(not) (not (1st args))]
+      [(=) (apply = args)]
+      [(<) (apply < args)]
+      [(>) (apply > args)]
+      [(<=) (apply <= args)]
+      [(>=) (apply >= args)]
       [(cons) (cons (1st args) (2nd args))]
-      [(=) (= (1st args) (2nd args))]
+      [(car) (car (1st args))]
+      [(cdr) (cdr (1st args))]
+      [(caar) (caar (1st args))]
+      [(cadr) (cadr (1st args))]
+      [(cdar) (cdar (1st args))]
+      [(cddr) (cddr (1st args))]
+      [(caaar) (caaar (1st args))]
+      [(caadr) (caadr (1st args))]
+      [(cadar) (cadar (1st args))]
+      [(cdaar) (cdaar (1st args))]
+      [(caddr) (caddr (1st args))]
+      [(cdadr) (cdadr (1st args))]
+      [(cddar) (cddar (1st args))]
+      [(cdddr) (cdddr (1st args))]
+      [(list) (apply list args)]
+      [(null?) (null? (1st args))]
+      [(assq) (assq (1st args) (2nd args))]
+      [(eq?) (eq? (1st args) (2nd args))]
+      [(equal?) (equal? (1st args) (2nd args))]
+      [(length) (length (1st args))]
+      [(list->vector) (list->vector (1st args))]
+      [(list?) (list? (1st args))]
+      [(pair?) (pair? (1st args))]
+      [(procedure?) (procedure? (1st args))]
+      [(vector->list) (vector->list (1st args))]
+      [(vector) (apply vector args)]
+      [(vector-ref) (vector-ref (1st args) (2nd args))]
+      [(vector?) (vector? (1st args))]
+      [(number?) (number? (1st args))]
+      [(symbol?) (symbol? (1st args))]
+      [(vector-set!) (vector-set! (1st args) (2nd args) (3rd args))]
       [else (error 'apply-prim-proc 
                    "Bad primitive procedure name: ~s" 
-                   prim-proc)])))
+                   prim-proc)]))) ; missing atom?, make-vector, display, newline
 
 (define rep      ; "read-eval-print" loop.
   (lambda ()
