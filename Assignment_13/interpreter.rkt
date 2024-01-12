@@ -129,13 +129,6 @@
     (if (and (not (hasList? lst)) (symList? lst)) (no-body-lambda-exp lst)
     (error 'parse-exp "An argument isn't a symbol: ~s" datum))))))))
 
-(define symList? 
-  (lambda (lst) 
-    (if (null? lst) #t
-    (if (symbol? (car lst)) (symList? (cdr lst)) 
-    #f 
-            ))))
-
 (define letBasicAssignment?
   (lambda (lst)
     (if (null? lst) #t
