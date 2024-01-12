@@ -35,33 +35,6 @@
 
 ; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
 
-(define symList? 
-  (lambda (lst) 
-    (if (null? lst) #t
-    (if (symbol? (car lst)) (symList? (cdr lst)) 
-    #f 
-            ))))
-
-(define letBasicAssignment?
-  (lambda (lst)
-    (if (null? lst) #t
-        (if (not (list? lst)) #f
-            (if (not (> (length lst) 1)) #f
-                (if (not (symbol? (car lst))) #f
-                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
-                        )))))))
-
-(define (lit-exp? data)
-  (or (number? data)
-      (string? data)
-      (symbol? data)
-      (boolean? data)
-      (and (list? data) (equal? (car data) 'quote))))
-
-(define (expressionList? lst)
-    (if (null? lst) #t
-    (if (not (expression? (car lst))) #f
-    (expressionList? (cdr lst)))))
 
 (define-datatype expression expression?
   [var-exp
@@ -121,6 +94,34 @@
 (define 2nd cadr)
 (define 3rd caddr)
 (define 4th cadddr)
+
+(define symList? 
+  (lambda (lst) 
+    (if (null? lst) #t
+    (if (symbol? (car lst)) (symList? (cdr lst)) 
+    #f 
+            ))))
+
+(define letBasicAssignment?
+  (lambda (lst)
+    (if (null? lst) #t
+        (if (not (list? lst)) #f
+            (if (not (> (length lst) 1)) #f
+                (if (not (symbol? (car lst))) #f
+                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
+                        )))))))
+
+(define (lit-exp? data)
+  (or (number? data)
+      (string? data)
+      (symbol? data)
+      (boolean? data)
+      (and (list? data) (equal? (car data) 'quote))))
+
+(define (expressionList? lst)
+    (if (null? lst) #t
+    (if (not (expression? (car lst))) #f
+    (expressionList? (cdr lst)))))
 
 (define parse-exp         
   (lambda (datum)
