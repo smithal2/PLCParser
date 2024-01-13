@@ -74,9 +74,7 @@
   [app-exp
    (rator var-exp?)
    (rand expressionList?)]
-  [cons-exp
-   (first expression?)
-   (second expression?)])
+)
 
 ;; environment type definitions
 
@@ -151,9 +149,8 @@
                                                                    (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
          [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
          [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
-         [(eqv? (car datum) 'cons) (if (= 3 (length datum)) (cons-exp (2nd datum) (3rd datum)) (error 'parse-exp "cons only needs 2 arguments: ~s" datum))]
          [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
-         [else (if (< 2 (length datum)) (app-exp (var-exp (1st datum))(map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
+         [else (if (> (length datum) 1) (app-exp (var-exp (1st datum))(map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
 
 ;-------------------+
@@ -260,7 +257,9 @@
                    "Attempt to apply bad procedure: ~s" 
                    proc-value)])))
 
-(define *prim-proc-names* '(+ - * add1 sub1 cons =))
+
+#|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
+(define *prim-proc-names* '(cons assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
