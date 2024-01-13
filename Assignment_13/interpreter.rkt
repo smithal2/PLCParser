@@ -274,9 +274,9 @@
   (lambda (prim-proc args)
     (case prim-proc
       [(+ - * / = < > <= >= list vector) (apply (eval prim-proc) args)]
-      [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?) ((eval prim-proc) (1st args))]
-      [(cons assq eq? equal? vector-ref) ((eval prim-proc) (1st args) (2nd args))]
-      [(vector-set!) (vector-set! (1st args) (2nd args) (3rd args))]
+      [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?) (if (= (length args) 1) ((eval prim-proc) (1st args)) (error 'apply-prim-proc "Exception in ~s: Expecting 1 argument but got ~s." prim-proc (length args)))]
+      [(cons assq eq? equal? vector-ref) (if (= (length args) 2) ((eval prim-proc) (1st args) (2nd args)) (error 'apply-prim-proc "Exception in ~s: Expecting 2 arguments but got ~s." prim-proc (length args)))]
+      [(vector-set!) (if (= (length args) 3) (vector-set! (1st args) (2nd args) (3rd args)) (error 'apply-prim-proc "Exception in ~s: Expecting 3 arguments but got ~s." prim-proc (length args)))]
       [else (error 'apply-prim-proc 
                    "Bad primitive procedure name: ~s" 
                    prim-proc)]))) ; missing atom?, make-vector, display, newline
