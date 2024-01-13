@@ -236,6 +236,8 @@
                (let ([proc-value (eval-exp rator)]
                      [args (eval-rands rands)])
                  (apply-proc proc-value args))]
+      [lambda-exp (id body)
+                  (lambda id body)]
       [else (error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; evaluate the list of operands, putting results into a list
