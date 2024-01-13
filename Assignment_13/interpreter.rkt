@@ -23,9 +23,9 @@
   (lambda (lst)
     (if (null? lst) #t
         (if (not (list? lst)) #f
-            (if (not (> (length lst) 1)) #f
-                (if (not (symbol? (car lst))) #f
-                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
+            (if (not (= (length (car lst)) 2)) #f
+                (if (not (symbol? (car (car lst)))) #f
+                    (if (not (expression? (parse-exp (cadr (car lst))))) #f (letBasicAssignment? (cdr lst))
                         )))))))
 
 (define (lit-exp? data)
