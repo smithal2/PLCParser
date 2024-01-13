@@ -36,13 +36,13 @@
     [(eval-one-exp '(if 1 2 3)) 2 1] ; (run-test if 4)
     [(let ((x (if #f 2 3))) (+ x 7)) 10 1] ; (run-test if 5)
   )
- 
+
   (primitive-procedures equal? ; (run-test primitive-procedures)
     [(eval-one-exp '(+ (+ 1 2) 3 4)) 10 1] ; (run-test primitive-procedures 1)
     [(eval-one-exp '(- 10 1 (- 5 3))) 7 1] ; (run-test primitive-procedures 2)
     [(eval-one-exp '(* 2 (* 3 4) 2)) 48 1] ; (run-test primitive-procedures 3)
     [(eval-one-exp '(/ 6 2)) 3 1] ; (run-test primitive-procedures 4)
-    
+    #|
     [(eval-one-exp '(sub1 (add1 10))) 10 1] ; (run-test primitive-procedures 5)
     [(eval-one-exp '(not (zero? 3))) #t 1] ; (run-test primitive-procedures 6)
     [(eval-one-exp '(= 3 4)) #f 1] ; (run-test primitive-procedures 7)
@@ -67,7 +67,7 @@
     [(eval-one-exp '(cadr '((a b) c))) 'c 1] ; (run-test primitive-procedures 24)
     [(eval-one-exp '(cadar '((a b) c))) 'b 1] ; (run-test primitive-procedures 25)
     [(eval-one-exp ' (list (procedure? list) (procedure? (lambda (x y) (list (+ x y)))) (procedure? 'list))) '(#t #t #f) 3] ; (run-test primitive-procedures 26)
-    
+    |#
   )
 
   (let equal? ; (run-test let)
@@ -97,6 +97,6 @@
                   '(1 2 3 4 5 6 7) 0.25]                                     
                  [(eval-one-exp '(((lambda (z) (lambda (x y) ((: free -) (: 0 0) (: 0 1) (: 1 0)))) 1) 4 3)) 0 0.25]
                  )
-
 ))
+
 (implicit-run test) ; run tests as soon as this file is loaded

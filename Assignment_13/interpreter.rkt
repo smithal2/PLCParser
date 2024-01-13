@@ -72,8 +72,8 @@
    (id var-exp?)
    (value expression?)]
   [app-exp
-   (rator expression?)
-   (rand expression?)]
+   (rator var-exp?)
+   (rand expressionList?)]
   [cons-exp
    (first expression?)
    (second expression?)])
@@ -153,7 +153,7 @@
          [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
          [(eqv? (car datum) 'cons) (if (= 3 (length datum)) (cons-exp (2nd datum) (3rd datum)) (error 'parse-exp "cons only needs 2 arguments: ~s" datum))]
          [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
-         [else (if (< 2 (length datum)) (app-exp (1st datum) (map (lambda (x) (parse-exp x)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
+         [else (if (< 2 (length datum)) (app-exp (var-exp (1st datum))(map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
 
 ;-------------------+
@@ -161,6 +161,8 @@
 ; sec:ENVIRONMENTS  |
 ;                   |
 ;-------------------+
+
+
 
 
 ; Environment definitions for CSSE 304 Scheme interpreter.  
