@@ -129,22 +129,6 @@
     (if (and (not (hasList? lst)) (symList? lst)) (no-body-lambda-exp lst)
     (error 'parse-exp "An argument isn't a symbol: ~s" datum))))))))
 
-(define letBasicAssignment?
-  (lambda (lst)
-    (if (null? lst) #t
-        (if (not (list? lst)) #f
-            (if (not (> (length lst) 1)) #f
-                (if (not (symbol? (car lst))) #f
-                    (if (not (expression? (cadr lst))) #f (letBasicAssignment? (cdr lst))
-                        )))))))
-
-(define (lit-exp? data)
-  (or (number? data)
-      (string? data)
-      (symbol? data)
-      (boolean? data)
-      (and (list? data) (equal? (car data) 'quote))))
-
 (define (expressionList? lst)
     (if (null? lst) #t
     (if (not (expression? (car lst))) #f
@@ -158,7 +142,10 @@
     (cond
       [(symbol? datum) (var-exp datum)]
       [(number? datum) (lit-exp datum)]
+      [(boolean? datum) (lit-exp datum)]
+      [(string? datum) (lit-exp datum)]
       [(list? datum)
+       (if (and (equal? (1st datum) 'quote) (= (length datum) 2)) (lit-exp (2nd datum))
        (cond
          [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
                                                                    (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
@@ -166,7 +153,7 @@
          [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
          [(eqv? (car datum) 'cons) (if (= 3 (length datum)) (cons-exp (2nd datum) (3rd datum)) (error 'parse-exp "cons only needs 2 arguments: ~s" datum))]
          [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
-         [else (if (< 2 (length datum)) (app-exp (1st datum) (map (lambda (x) (parse-exp x)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))])]
+         [else (if (< 2 (length datum)) (app-exp (1st datum) (map (lambda (x) (parse-exp x)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
       [else (error 'parse-exp "bad expression: ~s" datum)])))
 
 ;-------------------+
@@ -244,6 +231,8 @@
       [lit-exp (datum) datum]
       [var-exp (id)
                (apply-env init-env id)]
+      [if-exp (condition true false)
+              (if (eval-exp condition) (eval-exp true) (eval-exp false))]
       [app-exp (rator rands)
                (let ([proc-value (eval-exp rator)]
                      [args (eval-rands rands)])
