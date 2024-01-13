@@ -273,16 +273,66 @@
 ; Usually an interpreter must define each 
 ; built-in procedure individually.  We are "cheating" a little bit.
 
-(define apply-prim-proc
-  (lambda (prim-proc args)
-    (case prim-proc
-      [(+ - * / = < > <= >= list vector) (apply (eval prim-proc) args)]
-      [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?) (if (= (length args) 1) ((eval prim-proc) (1st args)) (error 'apply-prim-proc "Exception in ~s: Expecting 1 argument but got ~s." prim-proc (length args)))]
-      [(cons assq eq? equal? vector-ref) (if (= (length args) 2) ((eval prim-proc) (1st args) (2nd args)) (error 'apply-prim-proc "Exception in ~s: Expecting 2 arguments but got ~s." prim-proc (length args)))]
-      [(vector-set!) (if (= (length args) 3) (vector-set! (1st args) (2nd args) (3rd args)) (error 'apply-prim-proc "Exception in ~s: Expecting 3 arguments but got ~s." prim-proc (length args)))]
-      [else (error 'apply-prim-proc 
-                   "Bad primitive procedure name: ~s" 
-                   prim-proc)]))) ; missing atom?, make-vector, display, newline
+(define (apply-prim-proc prim-proc args)
+  (case prim-proc
+    [(+ - * / = < > <= >= list vector)
+     (case prim-proc
+       [(+) (apply + args)]
+       [(-) (apply - args)]
+       [(*) (apply * args)]
+       [(/) (apply / args)]
+       [(=) (apply = args)]
+       [(<) (apply < args)]
+       [(>) (apply > args)]
+       [(<=) (apply <= args)]
+       [(>=) (apply >= args)]
+       [(list) (apply list args)]
+       [(vector) (apply vector args)])]
+    [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?)
+     (if (= (length args) 1)
+         (case prim-proc
+           [(add1) (+ (1st args) 1)]
+           [(sub1) (- (1st args) 1)]
+           [(zero?) (zero? (1st args))]
+           [(not) (not (1st args))]
+           [(car) (car (1st args))]
+           [(cdr) (cdr (1st args))]
+           [(caar) (caar (1st args))]
+           [(cadr) (cadr (1st args))]
+           [(cdar) (cdar (1st args))]
+           [(cddr) (cddr (1st args))]
+           [(caaar) (caaar (1st args))]
+           [(caadr) (caadr (1st args))]
+           [(cadar) (cadar (1st args))]
+           [(cdaar) (cdaar (1st args))]
+           [(caddr) (caddr (1st args))]
+           [(cdadr) (cdadr (1st args))]
+           [(cddar) (cddar (1st args))]
+           [(cdddr) (cdddr (1st args))]
+           [(null?) (null? (1st args))]
+           [(length) (length (1st args))]
+           [(list->vector) (list->vector (1st args))]
+           [(list?) (list? (1st args))]
+           [(pair?) (pair? (1st args))]
+           [(procedure?) (procedure? (1st args))]
+           [(vector->list) (vector->list (1st args))]
+           [(vector?) (vector? (1st args))]
+           [(number?) (number? (1st args))]
+           [(symbol?) (symbol? (1st args))])
+         (error 'apply-prim-proc "Exception in ~s: Expected 1 argument but got ~s." prim-proc (length args)))]
+    [(cons assq eq? equal? vector-ref)
+     (if (= (length args) 2)
+         (case prim-proc
+           [(cons) (cons (1st args) (2nd args))]
+           [(assq) (assq (1st args) (2nd args))]
+           [(eq?) (eq? (1st args) (2nd args))]
+           [(equal?) (equal? (1st args) (2nd args))]
+           [(vector-ref) (vector-ref (1st args) (2nd args))])
+         (error 'apply-prim-proc "Exception in ~s: Expected 2 arguments but got ~s." prim-proc (length args)))]
+    [(vector-set!) (if (= (length args) 3) (vector-set! (1st args) (2nd args) (3rd args)) (error 'apply-prim-proc "Exception in ~s: Expected 3 arguments but got ~s." prim-proc (length args)))]
+    [else (error 'apply-prim-proc 
+                 "Bad primitive procedure name: ~s" 
+                 prim-proc)])) ; missing atom?, make-vector, display, newline
 
 (define rep      ; "read-eval-print" loop.
   (lambda ()
