@@ -21,12 +21,12 @@
 
 (define letBasicAssignment?
   (lambda (lst)
-    (if (or (null? lst)
-            (list? lst)
-            (> (length lst) 1)
-            (symbol? (car lst))
-            (expression? (cadr lst)))
-        #t (letBasicAssignment? (cdr lst)))))
+    (if (null? lst) #t
+        (if (not (list? lst)) #f
+            (if (not (= (length (car lst)) 2)) #f
+                (if (not (symbol? (car (car lst)))) #f
+                    (if (not (expression? (parse-exp (cadr (car lst))))) #f (letBasicAssignment? (cdr lst))
+                        )))))))
 
 (define (lit-exp? data)
   (lambda (x)
@@ -236,6 +236,8 @@
                (let ([proc-value (eval-exp rator)]
                      [args (eval-rands rands)])
                  (apply-proc proc-value args))]
+      [lambda-exp (id body)
+                  (lambda id body)]
       [else (error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; evaluate the list of operands, putting results into a list
