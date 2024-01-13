@@ -28,6 +28,15 @@
                     (if (not (expression? (parse-exp (cadr (car lst))))) #f (letBasicAssignment? (cdr lst))
                         )))))))
 
+(define letBasicAssignmentType?
+  (lambda (lst)
+    (if (null? lst) #t
+        (if (not (list? lst)) #f
+            (if (not (= (length (car lst)) 2)) #f
+                (if (not (var-exp? (car (car lst)))) #f
+                    (if (not (expression? (cadr (car lst)))) #f (letBasicAssignmentType? (cdr lst))
+                        )))))))
+
 (define (lit-exp? data)
   (lambda (x)
     (ormap 
@@ -54,15 +63,15 @@
   [no-body-lambda-exp
    (id symList?)]
   [let-exp-wo-body
-   (assignment letBasicAssignment?)]
+   (assignment letBasicAssignmentType?)]
   [letstar-exp 
-   (assignment letBasicAssignment?)
+   (assignment letBasicAssignmentType?)
    (body expression?)]
   [letrec-exp 
-   (assignment letBasicAssignment?)
+   (assignment letBasicAssignmentType?)
    (body expression?)]
   [let-exp 
-   (assignment letBasicAssignment?)
+   (assignment letBasicAssignmentType?)
    (body expression?)]
   [if-exp
    (condition expression?)
@@ -147,7 +156,7 @@
        (cond
          [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
                                                                    (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-         [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (2nd datum) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+         [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
          [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
          [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
          [else (if (> (length datum) 1) (app-exp (var-exp (1st datum))(map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
@@ -236,8 +245,10 @@
                (let ([proc-value (eval-exp rator)]
                      [args (eval-rands rands)])
                  (apply-proc proc-value args))]
+      [let-exp (assignment body) (assignment)]
       [lambda-exp (id body)
-                  (lambda id body)]
+                  (lambda id (eval-exp body))]
+      
       [else (error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; evaluate the list of operands, putting results into a list
