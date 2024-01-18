@@ -12,30 +12,29 @@
 ; parsed expression.  You'll probably want to replace this 
 ; code with your expression datatype from A11b
 
-(define symList? 
-  (lambda (lst) 
-    (if (null? lst) #t
-        (if (symbol? (car lst)) (symList? (cdr lst)) 
-            #f 
-            ))))
-
-(define letBasicAssignment?
+(define symList?
   (lambda (lst)
     (if (null? lst) #t
-        (if (not (list? lst)) #f
-            (if (not (= (length (car lst)) 2)) #f
-                (if (not (symbol? (car (car lst)))) #f
-                    (if (not (expression? (parse-exp (cadr (car lst))))) #f (letBasicAssignment? (cdr lst))
-                        )))))))
+        (if (symbol? (car lst)) (symList? (cdr lst))
+            #f))))
 
-(define letBasicAssignmentType?
-  (lambda (lst)
-    (if (null? lst) #t
-        (if (not (list? lst)) #f
-            (if (not (= (length (car lst)) 2)) #f
-                (if (not (var-exp? (car (car lst)))) #f
-                    (if (not (expression? (cadr (car lst)))) #f (letBasicAssignmentType? (cdr lst))
-                        )))))))
+(define (letBasicAssignment? lst)
+  (if (null? lst) #t
+      (if (and (list? lst)
+               (= (length (car lst)) 2)
+               (symbol? (car (car lst)))
+               (expression? (parse-exp (cadr (car lst)))))
+          (letBasicAssignment? (cdr lst))
+          #f)))
+
+(define (letBasicAssignmentType? lst)
+  (if (null? lst) #t
+      (if (and (list? lst)
+               (= (length (car lst)) 2)
+               (var-exp? (car (car lst)))
+               (expression? (parse-exp (cadr (car lst)))))
+          (letBasicAssignmentType? (cdr lst))
+          #f)))
 
 (define (lit-exp? data)
   (lambda (x)
@@ -43,11 +42,10 @@
      (lambda (pred) (pred x))
      (list number? vector? boolean? symbol? string? pair? null?))))
 
-(define var-exp?
-  (lambda (x)
-    (cases expression x
-      [var-exp (id) #t]
-      [else #f])))
+(define (var-exp? x)
+  (cases expression x
+    [var-exp (id) #t]
+    [else #f]))
 
 (define-datatype expression expression?
   [var-exp
@@ -174,31 +172,26 @@
 ; Environment definitions for CSSE 304 Scheme interpreter.  
 ; Based on EoPL sections 2.2 and 2.3
 
-(define empty-env
-  (lambda ()
-    (empty-env-record)))
+(define (empty-env) (empty-env-record))
 
-(define extend-env
-  (lambda (syms vals env)
-    (extended-env-record syms vals env)))
+(define (extend-env syms vals env)
+  (extended-env-record syms vals env))
 
-(define list-find-position
-  (lambda (sym los)
-    (let loop ([los los] [pos 0])
-      (cond [(null? los) #f]
-            [(eq? sym (car los)) pos]
-            [else (loop (cdr los) (add1 pos))]))))
+(define (list-find-position sym los)
+  (let loop ([los los] [pos 0])
+    (cond [(null? los) #f]
+          [(eq? sym (car los)) pos]
+          [else (loop (cdr los) (add1 pos))])))
 	    
-(define apply-env
-  (lambda (env sym) 
-    (cases environment env 
-      [empty-env-record ()      
-                        (error 'env "variable ~s not found." sym)]
-      [extended-env-record (syms vals env)
-                           (let ((pos (list-find-position sym syms)))
-                             (if (number? pos)
-                                 (list-ref vals pos)
-                                 (apply-env env sym)))])))
+(define (apply-env env sym)
+  (cases environment env
+    [empty-env-record ()
+                      (error 'env "variable ~s not found." sym)]
+    [extended-env-record (syms vals env)
+                         (let ((pos (list-find-position sym syms)))
+                           (if (number? pos)
+                               (list-ref vals pos)
+                               (apply-env env sym)))]))
 
 
 ;-----------------------+
@@ -226,49 +219,45 @@
 
 ; top-level-eval evaluates a form in the global environment
 
-(define top-level-eval
-  (lambda (form)
+(define (top-level-eval form)
     ; later we may add things that are not expressions.
-    (eval-exp form)))
+    (eval-exp form))
 
 ; eval-exp is the main component of the interpreter
 
-(define eval-exp
-  (lambda (exp)
-    (cases expression exp
-      [lit-exp (datum) datum]
-      [var-exp (id)
-               (apply-env init-env id)]
-      [if-exp (condition true false)
-              (if (eval-exp condition) (eval-exp true) (eval-exp false))]
-      [app-exp (rator rands)
-               (let ([proc-value (eval-exp rator)]
-                     [args (eval-rands rands)])
-                 (apply-proc proc-value args))]
-      [let-exp (assignment body) (assignment)]
-      [lambda-exp (id body)
-                  (lambda id (eval-exp body))]
-      
-      [else (error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+(define (eval-exp exp)
+  (cases expression exp
+    [lit-exp (datum) datum]
+    [var-exp (id)
+             (apply-env init-env id)]
+    [if-exp (condition true false)
+            (if (eval-exp condition) (eval-exp true) (eval-exp false))]
+    [app-exp (rator rands)
+             (let ([proc-value (eval-exp rator)]
+                   [args (eval-rands rands)])
+               (apply-proc proc-value args))]
+    [let-exp (assignment body) (assignment)]
+    [lambda-exp (id body)
+                (lambda id (eval-exp body))]
+    
+    [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 ; evaluate the list of operands, putting results into a list
 
-(define eval-rands
-  (lambda (rands)
-    (map eval-exp rands)))
+(define (eval-rands rands)
+  (map eval-exp rands))
 
 ;  Apply a procedure to its arguments.
 ;  At this point, we only have primitive procedures.  
 ;  User-defined procedures will be added later.
 
-(define apply-proc
-  (lambda (proc-value args)
-    (cases proc-val proc-value
-      [prim-proc (op) (apply-prim-proc op args)]
-      ; You will add other cases
-      [else (error 'apply-proc
-                   "Attempt to apply bad procedure: ~s" 
-                   proc-value)])))
+(define (apply-proc proc-value args)
+  (cases proc-val proc-value
+    [prim-proc (op) (apply-prim-proc op args)]
+    ; You will add other cases
+    [else (error 'apply-proc
+                 "Attempt to apply bad procedure: ~s" 
+                 proc-value)]))
 
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
@@ -345,14 +334,13 @@
                  "Bad primitive procedure name: ~s" 
                  prim-proc)])) ; missing atom?, make-vector, display, newline
 
-(define rep      ; "read-eval-print" loop.
-  (lambda ()
-    (display "--> ")
-    ;; notice that we don't save changes to the environment...
-    (let ([answer (top-level-eval (parse-exp (read)))])
-      ;; TODO: are there answers that should display differently?
-      (pretty-print answer) (newline)
-      (rep))))  ; tail-recursive, so stack doesn't grow.
+(define (rep)      ; "read-eval-print" loop.
+  (display "--> ")
+  ;; notice that we don't save changes to the environment...
+  (let ([answer (top-level-eval (parse-exp (read)))])
+    ;; TODO: are there answers that should display differently?
+    (pretty-print answer) (newline)
+    (rep)))  ; tail-recursive, so stack doesn't grow.
 
-(define eval-one-exp
-  (lambda (x) (top-level-eval (parse-exp x))))
+(define (eval-one-exp x)
+  (top-level-eval (parse-exp x)))
