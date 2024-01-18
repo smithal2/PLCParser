@@ -238,8 +238,8 @@
                (if (null? assignment)
                    (eval-exp body (extend-env syms vals env))
                    (recur (cdr assignment)
-                     (cons (cadar (1st assignment)) syms)
-                     (cons (cadadr (1st assignment)) vals))))]
+                     (cons (cadaar assignment) syms)
+                     (cons (eval-exp (cadar assignment) env) vals))))]
     [lambda-exp (id body)
                 (lambda id (eval-exp body env))]
     
