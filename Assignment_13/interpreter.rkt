@@ -85,8 +85,7 @@
 
 ;; environment type definitions
 
-(define scheme-value?
-  (lambda (x) #t))
+(define (scheme-value? x) #t)
   
 (define-datatype environment environment?
   [empty-env-record]
@@ -120,45 +119,42 @@
 (define 3rd caddr)
 (define 4th cadddr)
 
-(define hasList?
-  (lambda (lst)
-    (if (null? lst) #f
-    (if (list? (car lst)) #t (hasList? (cdr lst))))))
+(define (hasList? lst)
+  (if (null? lst) #f
+      (if (list? (car lst)) #t (hasList? (cdr lst)))))
 
-(define unlimited-arg-lambda
-  (lambda (lst datum)
-    (if (and (= (length lst) 1) (symbol? (car lst))) (no-body-lambda-exp lst)
-    (if (and (= (length lst) 1) (not (symbol? (car lst))))(error 'parse-exp "The argument isn't a symbol: ~s" datum)
-    (let ([everything-but-last (reverse (cdr (reverse lst)))] [last-element (cadr (reverse lst))])
-    (if (and (hasList? lst) (symList? everything-but-last)) (unlimited-lambda-exp everything-but-last last-element)
-    (if (and (not (hasList? lst)) (symList? lst)) (no-body-lambda-exp lst)
-    (error 'parse-exp "An argument isn't a symbol: ~s" datum))))))))
+(define (unlimited-arg-lambda lst datum)
+  (if (and (= (length lst) 1) (symbol? (car lst))) (no-body-lambda-exp lst)
+      (if (and (= (length lst) 1) (not (symbol? (car lst)))) (error 'parse-exp "The argument isn't a symbol: ~s" datum)
+          (let ([everything-but-last (reverse (cdr (reverse lst)))] [last-element (cadr (reverse lst))])
+            (if (and (hasList? lst) (symList? everything-but-last)) (unlimited-lambda-exp everything-but-last last-element)
+                (if (and (not (hasList? lst)) (symList? lst)) (no-body-lambda-exp lst)
+                    (error 'parse-exp "An argument isn't a symbol: ~s" datum)))))))
 
 (define (expressionList? lst)
-    (if (null? lst) #t
-    (if (not (expression? (car lst))) #f
-    (expressionList? (cdr lst)))))
+  (if (null? lst) #t
+      (if (not (expression? (car lst))) #f
+          (expressionList? (cdr lst)))))
 
 
 ; Again, you'll probably want to use your code from A11b
 
-(define parse-exp         
-  (lambda (datum)
-    (cond
-      [(symbol? datum) (var-exp datum)]
-      [(number? datum) (lit-exp datum)]
-      [(boolean? datum) (lit-exp datum)]
-      [(string? datum) (lit-exp datum)]
-      [(list? datum)
-       (if (and (equal? (1st datum) 'quote) (= (length datum) 2)) (lit-exp (2nd datum))
-       (cond
-         [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
-                                                                   (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-         [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
-         [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
-         [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
-         [else (if (> (length datum) 1) (app-exp (var-exp (1st datum))(map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
-      [else (error 'parse-exp "bad expression: ~s" datum)])))
+(define (parse-exp datum)
+  (cond
+    [(symbol? datum) (var-exp datum)]
+    [(number? datum) (lit-exp datum)]
+    [(boolean? datum) (lit-exp datum)]
+    [(string? datum) (lit-exp datum)]
+    [(list? datum)
+     (if (and (equal? (1st datum) 'quote) (= (length datum) 2)) (lit-exp (2nd datum))
+         (cond
+           [(eqv? (car datum) 'lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
+                                                                     (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
+           [(or (eqv? (car datum) 'let) (eqv? (car datum) 'letrec) (eqv? (car datum) 'let*)) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (parse-exp (3rd datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(eqv? (car datum) 'if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
+           [(eqv? (car datum) 'set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
+           [else (if (> (length datum) 1) (app-exp (var-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
+    [else (error 'parse-exp "bad expression: ~s" datum)]))
 
 ;-------------------+
 ;                   |
@@ -221,31 +217,33 @@
 
 (define (top-level-eval form)
     ; later we may add things that are not expressions.
-    (eval-exp form))
+  (eval-exp form init-env))
 
 ; eval-exp is the main component of the interpreter
 
-(define (eval-exp exp)
+(define (eval-exp exp env)
   (cases expression exp
     [lit-exp (datum) datum]
-    [var-exp (id)
-             (apply-env init-env id)]
+    [var-exp (id) (apply-env env id)]
     [if-exp (condition true false)
-            (if (eval-exp condition) (eval-exp true) (eval-exp false))]
+            (if (eval-exp condition env) (eval-exp true env) (eval-exp false env))]
     [app-exp (rator rands)
-             (let ([proc-value (eval-exp rator)]
-                   [args (eval-rands rands)])
+             (let ([proc-value (eval-exp rator env)]
+                   [args (map (lambda (rands) (eval-exp rands env)) rands)])
                (apply-proc proc-value args))]
-    [let-exp (assignment body) (assignment)]
+    [let-exp (assignment body)
+             (let recur ([assignment assignment]
+                         [syms null]
+                         [vals null])
+               (if (null? assignment)
+                   (eval-exp body (extend-env syms vals env))
+                   (recur (cdr assignment)
+                     (cons (cadar (1st assignment)) syms)
+                     (cons (cadadr (1st assignment)) vals))))]
     [lambda-exp (id body)
-                (lambda id (eval-exp body))]
+                (lambda id (eval-exp body env))]
     
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
-
-; evaluate the list of operands, putting results into a list
-
-(define (eval-rands rands)
-  (map eval-exp rands))
 
 ;  Apply a procedure to its arguments.
 ;  At this point, we only have primitive procedures.  
