@@ -260,9 +260,14 @@
                  "Attempt to apply bad procedure: ~s" 
                  proc-value)]))
 
+(define our-map
+  (lambda (proc items)
+    (if (null? items) '()
+        (append (list (apply-proc proc (list (car items)))) (our-map proc (cdr items))))))
+
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
-(define *prim-proc-names* '(cons void assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
+(define *prim-proc-names* '(cons apply map assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -322,10 +327,12 @@
            [(number?) (number? (1st args))]
            [(symbol?) (symbol? (1st args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 1 argument but got ~s." prim-proc (length args)))]
-    [(cons assq eq? equal? vector-ref)
+    [(cons assq eq? equal? vector-ref map apply)
      (if (= (length args) 2)
          (case prim-proc
            [(cons) (cons (1st args) (2nd args))]
+           [(apply) (apply-proc (1st args) (2nd args))]
+           [(map) (our-map (1st args) (2nd args))]
            [(assq) (assq (1st args) (2nd args))]
            [(eq?) (eq? (1st args) (2nd args))]
            [(equal?) (equal? (1st args) (2nd args))]
