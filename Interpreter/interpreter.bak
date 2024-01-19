@@ -3,12 +3,6 @@
 (require "../chez-init.rkt")
 (provide eval-one-exp)
 
-(provide add-macro-interpreter)
-(define add-macro-interpreter (lambda x (error "nyi")))
-(provide quasiquote-enabled?)
-(define quasiquote-enabled?
-(lambda () (error "nyi"))) ; make this return 'yes if you're trying quasiquote
-
 ;-------------------+
 ;                   |
 ;   sec:DATATYPES   |
