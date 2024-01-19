@@ -267,7 +267,7 @@
 
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
-(define *prim-proc-names* '(cons apply map assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
+(define *prim-proc-names* '(cons void apply map assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
