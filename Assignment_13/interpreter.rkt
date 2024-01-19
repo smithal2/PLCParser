@@ -54,10 +54,10 @@
    (data lit-exp?)]
   [lambda-exp
    (id symList?)
-   (body expression?)]
+   (body expressionList?)]
   [unlimited-lambda-exp
    (id symList?)
-   (body expression?)]
+   (body expressionList?)]
   [no-body-lambda-exp
    (id symList?)]
   [let-exp-wo-body
@@ -79,7 +79,7 @@
    (id var-exp?)
    (value expression?)]
   [app-exp
-   (rator var-exp?)
+   (rator expression?)
    (rand expressionList?)]
 )
 
@@ -148,12 +148,12 @@
     [(list? datum)
      (if (and (equal? (1st datum) 'quote) (= (length datum) 2)) (lit-exp (2nd datum))
          (case (car datum)
-           [(lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (parse-exp (3rd datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
+           [(lambda) (if (>= (length datum) 3) (if (list? (2nd datum)) (if (symList? (2nd datum)) (lambda-exp (2nd datum) (map parse-exp (cddr datum))) (error 'parse-exp "list of variables must consist of symbols: ~s" datum))
                                                    (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
            [(let let* letrec) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
            [(set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
-           [else (if (> (length datum) 1) (app-exp (var-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
+           [else (if (> (length datum) 1) (app-exp (parse-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
     [else (error 'parse-exp "bad expression: ~s" datum)]))
 
 ;-------------------+
@@ -230,7 +230,9 @@
     [app-exp (rator rands)
              (let ([proc-value (eval-exp rator env)]
                    [args (map (lambda (rands) (eval-exp rands env)) rands)])
-               (apply-proc proc-value args))]
+               (if (procedure? proc-value)
+                   (apply proc-value args)
+                   (apply-proc proc-value args)))]
     [let-exp (assignment bodies)
              (let recur ([assignment assignment]
                          [syms null]
@@ -240,9 +242,8 @@
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
-    [lambda-exp (id body)
-                (lambda id (eval-exp body env))]
-    
+    [lambda-exp (id bodies)
+                (lambda id (eval-exp bodies (car (reverse (map (lambda (body) (eval-exp body env)) bodies)))))]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 ;  Apply a procedure to its arguments.
@@ -251,7 +252,7 @@
 
 (define (apply-proc proc-value args)
   (cases proc-val proc-value
-    [prim-proc (op) (apply-prim-proc op args)]
+    [prim-proc (proc) (apply-prim-proc proc args)]
     ; You will add other cases
     [else (error 'apply-proc
                  "Attempt to apply bad procedure: ~s" 
