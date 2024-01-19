@@ -54,23 +54,23 @@
    (data lit-exp?)]
   [lambda-exp
    (id symList?)
-   (body expressionList?)]
+   (body (list-of? expression?))]
   [unlimited-lambda-exp
    (id symList?)
-   (body expressionList?)]
+   (body (list-of? expression?))]
   [no-body-lambda-exp
    (id symList?)]
   [let-exp-wo-body
    (assignment letBasicAssignmentType?)]
   [letstar-exp 
    (assignment letBasicAssignmentType?)
-   (bodies expressionList?)]
+   (bodies (list-of? expression?))]
   [letrec-exp 
    (assignment letBasicAssignmentType?)
-   (bodies expressionList?)]
+   (bodies (list-of? expression?))]
   [let-exp 
    (assignment letBasicAssignmentType?)
-   (bodies expressionList?)]
+   (bodies (list-of? expression?))]
   [if-exp
    (condition expression?)
    (true expression?)
@@ -80,7 +80,7 @@
    (value expression?)]
   [app-exp
    (rator expression?)
-   (rand expressionList?)]
+   (rand (list-of? expression?))]
 )
 
 ;; environment type definitions
@@ -100,7 +100,11 @@
 
 (define-datatype proc-val proc-val?
   [prim-proc
-   (name symbol?)])
+   (name symbol?)]
+  [closure
+   (parameters (list-of? symbol?))
+   (bodies (list-of? expression?))
+   (env environment?)])
 
   
 ;-------------------+
@@ -130,12 +134,6 @@
             (if (and (hasList? lst) (symList? everything-but-last)) (unlimited-lambda-exp everything-but-last last-element)
                 (if (and (not (hasList? lst)) (symList? lst)) (no-body-lambda-exp lst)
                     (error 'parse-exp "An argument isn't a symbol: ~s" datum)))))))
-
-(define (expressionList? lst)
-  (if (null? lst) #t
-      (if (not (expression? (car lst))) #f
-          (expressionList? (cdr lst)))))
-
 
 ; Again, you'll probably want to use your code from A11b
 
@@ -230,9 +228,7 @@
     [app-exp (rator rands)
              (let ([proc-value (eval-exp rator env)]
                    [args (map (lambda (rands) (eval-exp rands env)) rands)])
-               (if (procedure? proc-value)
-                   (apply proc-value args)
-                   (apply-proc proc-value args)))]
+                   (apply-proc proc-value args))]
     [let-exp (assignment bodies)
              (let recur ([assignment assignment]
                          [syms null]
@@ -243,7 +239,7 @@
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
     [lambda-exp (id bodies)
-                (lambda id (eval-exp bodies (car (reverse (map (lambda (body) (eval-exp body env)) bodies)))))]
+                (closure id bodies env)]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 ;  Apply a procedure to its arguments.
@@ -252,8 +248,8 @@
 
 (define (apply-proc proc-value args)
   (cases proc-val proc-value
-    [prim-proc (proc) (apply-prim-proc proc args)]
-    ; You will add other cases
+    [prim-proc (name) (apply-prim-proc name args)]
+    [closure (parameters bodies env) (car (reverse (map (lambda (body) (eval-exp body (extend-env parameters args env))) bodies)))]
     [else (error 'apply-proc
                  "Attempt to apply bad procedure: ~s" 
                  proc-value)]))
@@ -313,7 +309,7 @@
            [(list->vector) (list->vector (1st args))]
            [(list?) (list? (1st args))]
            [(pair?) (pair? (1st args))]
-           [(procedure?) (or (if (and (list? (1st args)) (member (car (1st args)) '(prim-proc))) #t #f) (procedure? (1st args)))]
+           [(procedure?) (or (if (and (list? (1st args)) (member (car (1st args)) '(prim-proc closure))) #t #f) (procedure? (1st args)))]
            [(vector->list) (vector->list (1st args))]
            [(vector?) (vector? (1st args))]
            [(number?) (number? (1st args))]
