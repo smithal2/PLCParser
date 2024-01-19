@@ -276,7 +276,7 @@
 
 (define (apply-prim-proc prim-proc args)
   (case prim-proc
-    [(+ - * / = < > <= >= list vector)
+    [(+ - * / = < > <= >= list vector void)
      (case prim-proc
        [(+) (apply + args)]
        [(-) (apply - args)]
@@ -289,6 +289,7 @@
        [(>=) (apply >= args)]
        [(list) (apply list args)]
        [(vector) (apply vector args)])]
+       [(void) (void)]
     [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?)
      (if (= (length args) 1)
          (case prim-proc
