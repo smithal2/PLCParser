@@ -149,7 +149,7 @@
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
            [(let let* letrec) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
-           [(if) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum))]
+           [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
            [else (if (> (length datum) 1) (app-exp (parse-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
     [else (error 'parse-exp "bad expression: ~s" datum)]))
@@ -194,7 +194,28 @@
 ;                       |
 ;-----------------------+
 
-; To be added in assignment 14.
+(define syntax-expand
+    (lambda (exp)
+        (cases expression exp
+            [var-exp (symbol) exp] ;; do nothing
+            [lit-exp (literal) exp] ;; do nothing
+            [lambda-exp (id body) exp]
+            [unlimited-lambda-exp (id body) exp]
+            [no-body-lambda-exp (id) exp]
+            [let-exp-wo-body (assignment) exp]
+            [letstar-exp (assignment bodies) exp]
+            [letrec-exp (assignment bodies) exp]
+            [let-exp (assingment  bodies) exp]
+            [if-exp (condition true false) exp]
+            [set-exp (id value) exp]
+            [app-exp (rator rand) exp]
+            #|[and-exp (exps)
+                    (cond [(null? exps) (lit-exp #t)]
+                          [(null? (cdr exps)) (syntax-expand (car exps))]
+                          [else (if-exp (syntax-expand (car exps))
+                                        (syntax-expand (and-exp (cdr exps)))
+                                        (lit-exp #f))])]|#
+          )))
 
 ;---------------------------------------+
 ;                                       |
@@ -262,9 +283,14 @@
                  "Attempt to apply bad procedure: ~s" 
                  proc-value)]))
 
+(define our-map
+  (lambda (proc items)
+    (if (null? items) '()
+        (append (list (apply-proc proc (list (car items)))) (our-map proc (cdr items))))))
+
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
-(define *prim-proc-names* '(cons assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
+(define *prim-proc-names* '(cons void apply map assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -324,10 +350,12 @@
            [(number?) (number? (1st args))]
            [(symbol?) (symbol? (1st args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 1 argument but got ~s." prim-proc (length args)))]
-    [(cons assq eq? equal? vector-ref)
+    [(cons assq eq? equal? vector-ref map apply)
      (if (= (length args) 2)
          (case prim-proc
            [(cons) (cons (1st args) (2nd args))]
+           [(apply) (apply-proc (1st args) (2nd args))]
+           [(map) (our-map (1st args) (2nd args))]
            [(assq) (assq (1st args) (2nd args))]
            [(eq?) (eq? (1st args) (2nd args))]
            [(equal?) (equal? (1st args) (2nd args))]
@@ -347,4 +375,4 @@
     (rep)))  ; tail-recursive, so stack doesn't grow.
 
 (define (eval-one-exp x)
-  (top-level-eval (parse-exp x)))
+  (top-level-eval (syntax-expand (parse-exp x))))
