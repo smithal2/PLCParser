@@ -200,7 +200,28 @@
 ;                       |
 ;-----------------------+
 
-; To be added in assignment 14.
+(define syntax-expand
+    (lambda (exp)
+        (cases expression exp
+            [var-exp (symbol) exp] ;; do nothing
+            [lit-exp (literal) exp] ;; do nothing
+            [lambda-exp (id body) exp]
+            [unlimited-lambda-exp (id body) exp]
+            [no-body-lambda-exp (id) exp]
+            [let-exp-wo-body (assignment) exp]
+            [letstar-exp (assignment bodies) exp]
+            [letrec-exp (assignment bodies) exp]
+            [let-exp (assingment  bodies) exp]
+            [if-exp (condition true false) exp]
+            [set-exp (id value) exp]
+            [app-exp (rator rand) exp]
+            #|[and-exp (exps)
+                    (cond [(null? exps) (lit-exp #t)]
+                          [(null? (cdr exps)) (syntax-expand (car exps))]
+                          [else (if-exp (syntax-expand (car exps))
+                                        (syntax-expand (and-exp (cdr exps)))
+                                        (lit-exp #f))])]|#
+          )))
 
 ;---------------------------------------+
 ;                                       |
@@ -352,4 +373,4 @@
     (rep)))  ; tail-recursive, so stack doesn't grow.
 
 (define (eval-one-exp x)
-  (top-level-eval (parse-exp x)))
+  (top-level-eval (syntax-expand (parse-exp x))))
