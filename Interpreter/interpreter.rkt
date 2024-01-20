@@ -367,7 +367,7 @@
            [(list->vector) (list->vector (1st args))]
            [(list?) (list? (1st args))]
            [(pair?) (pair? (1st args))]
-           [(procedure?) (or (if (and (list? (1st args)) (member (car (1st args)) '(prim-proc closure))) #t #f) (procedure? (1st args)))]
+           [(procedure?) (proc-val? (1st args))]
            [(vector->list) (vector->list (1st args))]
            [(vector?) (vector? (1st args))]
            [(number?) (number? (1st args))]
