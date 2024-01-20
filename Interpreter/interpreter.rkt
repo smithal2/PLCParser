@@ -229,11 +229,10 @@
                       [(null? exps) (lit-exp #f)]
                       [(null? (cdr exps)) (syntax-expand (car exps))]
                       [else (if-exp (syntax-expand (car exps)) (syntax-expand (car exps)) (syntax-expand (or-exp (cdr exps))))])]
-            [letstar-exp (assignment bodies) exp] 
-            [cond-exp (exps) (if (null? exp) (error 'syntax-expand "bad expression: cond needs arguments" exp)
-                             (if (and (not (equal? 'else (2nd (2nd (car exps))))) (null? (cdr exps))) (error 'syntax-expand "bad expression: cond needs an else statement" exp)
-                             (if (null? (cdr exps)) (syntax-expand (car (3rd (car exps))))
-                             (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps)))))))]
+            [letstar-exp (assignment bodies) exp]
+            [cond-exp (exps) (if (null? exps) (app-exp (var-exp 'void) '())
+                             (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
+                             (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
             [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
             [lambda-rest-exp (id bodies) exp]
             [lambda-improper-exp (id bodies) exp]
