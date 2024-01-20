@@ -211,13 +211,13 @@
         (cases expression exp
             [var-exp (symbol) exp] ;; do nothing
             [lit-exp (literal) exp] ;; do nothing
-            [lambda-exp (id body) exp]
+            [lambda-exp (id body) (lambda-exp id (map syntax-expand body))]
             [let-exp-wo-body (assignment) exp]
             [letrec-exp (assignment bodies) exp]
-            [let-exp (assingment  bodies) exp]
-            [if-exp (condition true false) exp]
+            [let-exp (assignment  bodies) (let-exp assignment (map syntax-expand bodies))]
+            [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
             [set-exp (id value) exp]
-            [app-exp (rator rand) exp]
+            [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
             [and-exp (exps)
                     (cond [(null? exps) (lit-exp #t)]
                           [(null? (cdr exps)) (syntax-expand (car exps))]
@@ -234,7 +234,7 @@
                              (if (and (not (equal? 'else (2nd (2nd (car exps))))) (null? (cdr exps))) (error 'syntax-expand "bad expression: cond needs an else statement" exp)
                              (if (null? (cdr exps)) (syntax-expand (car (3rd (car exps))))
                              (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps)))))))]
-            [begin-exp (exps) (app-exp (lambda-exp '() (cdr exps)) '())]
+            [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
             [lambda-rest-exp (id bodies) exp]
             [lambda-improper-exp (id bodies) exp]
           
