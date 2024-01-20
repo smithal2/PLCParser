@@ -87,6 +87,14 @@
   [app-exp
    (rator expression?)
    (rand (list-of? expression?))]
+  [and-exp
+   (expressions (list-of? expression?))]
+  [or-exp
+   (expressions (list-of? expression?))]
+  [begin-exp
+    (expressions (list-of? expression?))]
+  [cond-exp
+   (expression (list-of? expression?))]
 )
 
 ;; environment type definitions
@@ -156,6 +164,10 @@
                                                    (unlimited-arg-lambda (cdr datum) datum)) (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
            [(let let* letrec) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
+           [(and) (and-exp (map parse-exp (cdr datum)))]
+           [(or) (or-exp (map parse-exp (cdr datum)))]
+           [(begin) (begin-exp (map parse-exp (cdr datum)))]
+           [(cond) (cond-exp (map parse-exp (cdr datum)))]
            [(set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
            [else (if (> (length datum) 1) (app-exp (parse-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum))) (error 'parse-exp "Application Expression with no args: ~s" datum))]))]
     [else (error 'parse-exp "bad expression: ~s" datum)]))
@@ -209,18 +221,30 @@
             [unlimited-lambda-exp (id body) exp]
             [no-body-lambda-exp (id) exp]
             [let-exp-wo-body (assignment) exp]
-            [letstar-exp (assignment bodies) exp]
             [letrec-exp (assignment bodies) exp]
             [let-exp (assingment  bodies) exp]
             [if-exp (condition true false) exp]
             [set-exp (id value) exp]
             [app-exp (rator rand) exp]
-            #|[and-exp (exps)
+            [and-exp (exps)
                     (cond [(null? exps) (lit-exp #t)]
                           [(null? (cdr exps)) (syntax-expand (car exps))]
                           [else (if-exp (syntax-expand (car exps))
                                         (syntax-expand (and-exp (cdr exps)))
-                                        (lit-exp #f))])]|#
+                                        (lit-exp #f))])]
+            [or-exp (exps)
+                    (cond
+                      [(null? exps) (lit-exp #f)]
+                      [(null? (cdr exps)) (syntax-expand (car exps))]
+                      [else (if-exp (syntax-expand (car exps)) (syntax-expand (car exps)) (syntax-expand (or-exp (cdr exps))))])]
+            [letstar-exp (assignment bodies) exp] 
+            [cond-exp (exps) (if (null? exp) (error 'syntax-expand "bad expression: cond needs arguments" exp)
+                             (if (and (not (equal? 'else (2nd (2nd (car exps))))) (null? (cdr exps))) (error 'syntax-expand "bad expression: cond needs an else statement" exp)
+                             (if (null? (cdr exps)) (syntax-expand (car (3rd (car exps))))
+                             (if #t (display exps)
+                             (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))))]
+            [begin-exp (exps) exp]
+          
           )))
 
 ;---------------------------------------+
