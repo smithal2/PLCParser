@@ -211,7 +211,7 @@
             [lit-exp (literal) exp] ;; do nothing
             [lambda-exp (id body) (lambda-exp id (map syntax-expand body))]
             [letrec-exp (assignment bodies) exp]
-            [let-exp (assignment  bodies) (let-exp assignment (map syntax-expand bodies))]
+            [let-exp (assignment  bodies) (let-exp (map (lambda (x) (append (list (1st x)) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
             [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
             [set-exp (id value) exp]
             [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
