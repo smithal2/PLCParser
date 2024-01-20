@@ -236,6 +236,8 @@
                              (if #t (display exps)
                              (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))))]
             [begin-exp (exps) exp]
+            [lambda-rest-exp (id bodies) exp]
+            [lambda-improper-exp (id bodies) exp]
           
           )))
 
