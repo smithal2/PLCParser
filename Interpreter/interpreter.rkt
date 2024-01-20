@@ -226,8 +226,8 @@
                       [(null? exps) (lit-exp #f)]
                       [(null? (cdr exps)) (syntax-expand (car exps))]
                       [else (if-exp (syntax-expand (car exps)) (syntax-expand (car exps)) (syntax-expand (or-exp (cdr exps))))])]
-            [letstar-exp (assignment bodies) (if (null? (cdr assignment)) (syntax-expand (let-exp (car assignment) bodies))
-                                             (let-exp (append (list (1st (car x))) (list (syntax-expand (2nd (car x))))) (syntax-exp (letstar-exp (cdr assignment) bodies))))  ]
+            [letstar-exp (assignment bodies) (if (null? (cdr assignment)) (syntax-expand (let-exp assignment bodies))
+                                             (let-exp (list(car assignment)) (syntax-expand (letstar-exp (cdr assignment) bodies)))) ]
             [cond-exp (exps) (if (null? exps) (app-exp (var-exp 'void) '())
                              (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
                              (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
