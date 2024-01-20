@@ -68,8 +68,6 @@
   [lambda-improper-exp
    (id symImproperList?)
    (body (list-of? expression?))]
-  [let-exp-wo-body
-   (assignment letBasicAssignmentType?)]
   [letstar-exp 
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
@@ -156,7 +154,7 @@
                                                  [(pair? (2nd datum)) (lambda-improper-exp (2nd datum) (map parse-exp (cddr datum)))]
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) (if (= 2 (length datum)) (let-exp-wo-body (2nd datum)) (let-exp (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum)))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp) ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
@@ -212,7 +210,6 @@
             [var-exp (symbol) exp] ;; do nothing
             [lit-exp (literal) exp] ;; do nothing
             [lambda-exp (id body) (lambda-exp id (map syntax-expand body))]
-            [let-exp-wo-body (assignment) exp]
             [letrec-exp (assignment bodies) exp]
             [let-exp (assignment  bodies) (let-exp (map (lambda (x) (append (list (1st x)) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
             [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
