@@ -1,7 +1,13 @@
 #lang racket
 
 (require "../chez-init.rkt")
-(provide eval-one-exp)
+(provide eval-one-exp y2 advanced-letrec)
+
+(define (y2 which f1 f2) "nyi")
+(define-syntax (advanced-letrec stx)
+  (syntax-case stx ()
+    [(advanced-letrec ((fun-name fun-body) ...) letrec-body)
+     #'(error "nyi")]))
 
 ;-------------------+
 ;                   |
