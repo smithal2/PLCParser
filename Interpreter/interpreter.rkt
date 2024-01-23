@@ -93,6 +93,9 @@
    (expressions (list-of? expression?))]
   [begin-exp
     (expressions (list-of? expression?))]
+  [while-exp
+   (condition expression?)
+   (expressions (list-of? expression?))]
   [cond-exp
    (expression (list-of? expression?))]
 )
@@ -154,11 +157,14 @@
                                                  [(pair? (2nd datum)) (lambda-improper-exp (2nd datum) (map parse-exp (cddr datum)))]
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp) ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case
+                                                                         (1st datum) ((let) let-exp) ((let*) letstar-exp)
+                                                                         ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
            [(begin) (begin-exp (map parse-exp (cdr datum)))]
+           [(while) (if (< 2 (length datum)) (while-exp (parse-exp (cadr datum)) (map parse-exp (cdr (cdr datum)))) (error 'parse-exp "need condition and body: ~s" datum))]
            [(cond) (cond-exp (map parse-exp (cdr datum)))]
            [(set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
            [else (app-exp (parse-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum)))]))]
@@ -211,7 +217,7 @@
             [lit-exp (literal) exp] ;; do nothing
             [lambda-exp (id body) (lambda-exp id (map syntax-expand body))]
             [letrec-exp (assignment bodies) exp]
-            [let-exp (assignment  bodies) (let-exp (map (lambda (x) (append (list (1st x)) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+            [let-exp (assignment  bodies) (let-exp (map (lambda (x) (append (list (1st x)) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]                            
             [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
             [set-exp (id value) exp]
             [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
@@ -232,9 +238,10 @@
                              (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
                              (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
             [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
+            #|[while-exp (condition exps) (if-exp (syntax-expand condition)(app-exp (lambda-exp '() (map syntax-expand (append exps (list (while-exp condition exps))))) '())
+                                            (app-exp (var-exp 'void) '()))]|#
             [lambda-rest-exp (id bodies) exp]
             [lambda-improper-exp (id bodies) exp]
-          
           )))
 
 ;---------------------------------------+
