@@ -77,6 +77,10 @@
   [let-exp 
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
+  [let-named-exp
+   (name symbol?)
+   (assignment letBasicAssignmentType?)
+   (bodies (list-of? expression?))]
   [if-exp
    (condition expression?)
    (true expression?)
@@ -154,7 +158,7 @@
                                                  [(pair? (2nd datum)) (lambda-improper-exp (2nd datum) (map parse-exp (cddr datum)))]
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp) ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) (if (symbol? (2nd datum)) let-named-exp let-exp)) ((let*) letstar-exp) ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
@@ -207,35 +211,34 @@
 (define syntax-expand
     (lambda (exp)
         (cases expression exp
-            [var-exp (symbol) exp] ;; do nothing
-            [lit-exp (literal) exp] ;; do nothing
-            [lambda-exp (id body) (lambda-exp id (map syntax-expand body))]
-            [letrec-exp (assignment bodies) exp]
-            [let-exp (assignment  bodies) (let-exp (map (lambda (x) (append (list (1st x)) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
-            [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
-            [set-exp (id value) exp]
-            [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
-            [and-exp (exps)
-                    (cond [(null? exps) (lit-exp #t)]
-                          [(null? (cdr exps)) (syntax-expand (car exps))]
-                          [else (if-exp (syntax-expand (car exps))
-                                        (syntax-expand (and-exp (cdr exps)))
-                                        (lit-exp #f))])]
-            [or-exp (exps)
-                    (cond
-                      [(null? exps) (lit-exp #f)]
-                      [(null? (cdr exps)) (syntax-expand (car exps))]
-                      [else (if-exp (syntax-expand (car exps)) (syntax-expand (car exps)) (syntax-expand (or-exp (cdr exps))))])]
-            [letstar-exp (assignment bodies) (if (null? (cdr assignment)) (syntax-expand (let-exp assignment bodies))
-                                             (syntax-expand (let-exp (list(car assignment)) (list (syntax-expand (letstar-exp (cdr assignment) bodies)))))) ]
-            [cond-exp (exps) (if (null? exps) (app-exp (var-exp 'void) '())
-                             (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
-                             (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
-            [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
-            [lambda-rest-exp (id bodies) exp]
-            [lambda-improper-exp (id bodies) exp]
-          
-          )))
+          [var-exp (symbol) exp] ;; do nothing
+          [lit-exp (literal) exp] ;; do nothing
+          [lambda-exp (id bodies) (lambda-exp id (map syntax-expand bodies))]
+          [letrec-exp (assignment bodies) (letrec-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [let-named-exp (name assignment bodies) (let-named-exp name (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
+          [set-exp (id value) exp]
+          [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
+          [and-exp (exps)
+                   (cond [(null? exps) (lit-exp #t)]
+                         [(null? (cdr exps)) (syntax-expand (car exps))]
+                         [else (if-exp (syntax-expand (car exps))
+                                       (syntax-expand (and-exp (cdr exps)))
+                                       (lit-exp #f))])]
+          [or-exp (exps)
+                  (cond
+                    [(null? exps) (lit-exp #f)]
+                    [(null? (cdr exps)) (syntax-expand (car exps))]
+                    [else (if-exp (syntax-expand (car exps)) (syntax-expand (car exps)) (syntax-expand (or-exp (cdr exps))))])]
+          [letstar-exp (assignment bodies) (if (null? (cdr assignment)) (syntax-expand (let-exp assignment bodies))
+                                               (syntax-expand (let-exp (list(car assignment)) (list (syntax-expand (letstar-exp (cdr assignment) bodies)))))) ]
+          [cond-exp (exps) (if (null? exps) (app-exp (var-exp 'void) '())
+                               (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
+                                   (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
+          [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
+          [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
+          [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))])))
 
 ;---------------------------------------+
 ;                                       |
@@ -279,6 +282,8 @@
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
+    [let-named-exp (name assignment bodies)
+                   (eval-exp (let-exp assignment bodies) env)] ;not final
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
