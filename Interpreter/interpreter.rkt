@@ -224,7 +224,7 @@
           [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
           [let-named-exp (name assignment bodies) (let-named-exp name (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
           [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
-          [set-exp (id value) exp]
+          [set-exp (id value) (set-exp id (syntax-expand value))]
           [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
           [and-exp (exps)
                    (cond [(null? exps) (lit-exp #t)]
@@ -244,7 +244,8 @@
                                    (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
           [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
           [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
-          [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))])))
+          [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))]
+          [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))])))
 
 ;---------------------------------------+
 ;                                       |
