@@ -151,12 +151,6 @@
 (define 3rd caddr)
 (define 4th cadddr)
 
-(define let-rec-bodies-helper
-  (lambda (procs)
-    (if (null? procs) '()
-    (append (list (map (lambda (data) (parse-exp data)) (cdr (cdr (cadr (car procs)))))) (let-rec-bodies-helper (cdr procs)))
-    )))
-
 ; Again, you'll probably want to use your code from A11b
 
 (define (parse-exp datum)
@@ -178,7 +172,7 @@
            [(letrec) (if (letBasicAssignment? (2nd datum)) (letrec-exp
                                                             (map car (2nd datum))
                                                             (map cadadr (2nd datum))
-                                                            (let-rec-bodies-helper (2nd datum))
+                                                            (map (lambda (bodies) (map parse-exp (cddadr bodies))) (2nd datum))
                                                             (map parse-exp (cddr datum)))
                          (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
@@ -319,8 +313,8 @@
     [let-named-exp (name assignment bodies)
                    (eval-exp (let-exp assignment bodies) env)] ;not final
     [letrec-exp (proc-names idss bodiess letrec-bodies)
-                (map (lambda (letrec-body)
-                       (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)]
+                (car (reverse (map (lambda (letrec-body)
+                                     (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)))]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
