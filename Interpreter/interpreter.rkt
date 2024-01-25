@@ -72,8 +72,10 @@
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
   [letrec-exp 
-   (assignment letBasicAssignmentType?)
-   (bodies (list-of? expression?))]
+   (proc-names (list-of? symbol?))
+   (idss (list-of? (list-of? symbol?)))
+   (bodiess (list-of? (list-of? expression?)))
+   (letrec-bodies (list-of? expression?))]
   [let-exp 
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
@@ -113,7 +115,12 @@
   [extended-env-record
    (syms (list-of? symbol?))
    (vals (list-of? scheme-value?))
-   (env environment?)])
+   (env environment?)]
+  [recursively-extended-env-record
+   (proc-names (list-of? symbol?))
+   (idss (list-of? (list-of? symbol?)))
+   (bodiess (list-of? (list-of? expression?)))
+   (old-env environment?)])
 
 
 ; datatype for procedures.  At first there is only one
@@ -144,6 +151,12 @@
 (define 3rd caddr)
 (define 4th cadddr)
 
+(define let-rec-bodies-helper
+  (lambda (procs)
+    (if (null? procs) '()
+    (append (list (map (lambda (data) (parse-exp data)) (cdr (cdr (cadr (car procs)))))) (let-rec-bodies-helper (cdr procs)))
+    )))
+
 ; Again, you'll probably want to use your code from A11b
 
 (define (parse-exp datum)
@@ -161,9 +174,13 @@
                                                  [(pair? (2nd datum)) (lambda-improper-exp (2nd datum) (map parse-exp (cddr datum)))]
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-           [(let let* letrec) (if (letBasicAssignment? (2nd datum)) ((case
-                                                                         (1st datum) ((let) (if (symbol? (2nd datum)) let-named-exp let-exp)) ((let*) letstar-exp)
-                                                                         ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(let let*) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) (if (symbol? (2nd datum)) let-named-exp let-exp)) ((let*) letstar-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum))]
+           [(letrec) (if (letBasicAssignment? (2nd datum)) (letrec-exp
+                                                            (map car (2nd datum))
+                                                            (map cadadr (2nd datum))
+                                                            (let-rec-bodies-helper (2nd datum))
+                                                            (map parse-exp (cddr datum)))
+                         (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
@@ -191,6 +208,9 @@
 (define (extend-env syms vals env)
   (extended-env-record syms vals env))
 
+(define (extend-env-recursively proc-names idss bodiess old-env)
+  (recursively-extended-env-record proc-names idss bodiess old-env))
+
 (define (list-find-position sym los)
   (let loop ([los los] [pos 0])
     (cond [(null? los) #f]
@@ -205,7 +225,14 @@
                          (let ((pos (list-find-position sym syms)))
                            (if (number? pos)
                                (list-ref vals pos)
-                               (apply-env env sym)))]))
+                               (apply-env env sym)))]
+    [recursively-extended-env-record (proc-names idss bodiess old-env)
+                                   (let ([pos (list-find-position sym proc-names)])
+                                     (if (number? pos)
+                                         (closure (list-ref idss pos)
+                                                  (list-ref bodiess pos)
+                                                  env)
+                                         (apply-env old-env sym)))]))
 
 
 ;-----------------------+
@@ -220,7 +247,7 @@
           [var-exp (symbol) exp] ;; do nothing
           [lit-exp (literal) exp] ;; do nothing
           [lambda-exp (id bodies) (lambda-exp id (map syntax-expand bodies))]
-          [letrec-exp (assignment bodies) (letrec-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [letrec-exp (proc-names idss bodiess letrec-bodies) (letrec-exp proc-names idss (map (lambda (bodies) (map syntax-expand bodies)) bodiess) (map syntax-expand letrec-bodies))]
           [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
           [let-named-exp (name assignment bodies) (let-named-exp name (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
           [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
@@ -291,6 +318,9 @@
                      (cons (eval-exp (cadar assignment) env) vals))))]
     [let-named-exp (name assignment bodies)
                    (eval-exp (let-exp assignment bodies) env)] ;not final
+    [letrec-exp (proc-names idss bodiess letrec-bodies)
+                (map (lambda (letrec-body)
+                       (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
@@ -327,7 +357,7 @@
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
    *prim-proc-names*   ;  a value (not an expression) with an identifier.
-   (map prim-proc      
+   (map prim-proc
         *prim-proc-names*)
    (empty-env)))
 
@@ -390,6 +420,7 @@
            [(map) (our-map (1st args) (2nd args))]
            [(assq) (assq (1st args) (2nd args))]
            [(eq?) (eq? (1st args) (2nd args))]
+           [(eqv?) (eqv? (1st args) (2nd args))]
            [(equal?) (equal? (1st args) (2nd args))]
            [(vector-ref) (vector-ref (1st args) (2nd args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 2 arguments but got ~s." prim-proc (length args)))]
