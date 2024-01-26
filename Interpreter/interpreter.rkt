@@ -259,7 +259,6 @@
                                (if (and (equal? 'else (2nd (2nd (car exps)))) (null? (cdr exps))) (syntax-expand (car (3rd (car exps))))
                                    (if-exp (syntax-expand (2nd (car exps))) (syntax-expand (car (3rd (car exps)))) (syntax-expand (cond-exp (cdr exps))))))]
           [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
-          [while-exp (condition exps) (while-exp (syntax-expand condition) (syntax-expand exps))]
           [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
           [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))]
           [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))])))
@@ -306,9 +305,6 @@
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
-    [let-named-exp (name assignment bodies)
-                   (eval-exp (car bodies) (extend-env (append (list (cadr (car (car assignment)))) (list name) ) (append (list (cadr (cadr (car bodies)))) (list bodies)) env))] ;not final
-    [letrec-exp (id bodies) (eval-exp (letrec-exp id bodies) env)]
     [letrec-exp (proc-names idss bodiess letrec-bodies)
                 (car (reverse (map (lambda (letrec-body)
                                      (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)))]
@@ -348,7 +344,7 @@
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
    *prim-proc-names*   ;  a value (not an expression) with an identifier.
-   (map prim-proc      
+   (map prim-proc
         *prim-proc-names*)
    (empty-env)))
 
