@@ -339,7 +339,7 @@
 
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
-(define *prim-proc-names* '(cons void apply map assq eq? equal? vector-ref vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
+(define *prim-proc-names* '(cons append void apply map assq eq? eqv? equal? vector-ref quotient list-tail vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -399,7 +399,7 @@
            [(number?) (number? (1st args))]
            [(symbol?) (symbol? (1st args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 1 argument but got ~s." prim-proc (length args)))]
-    [(cons assq eq? equal? vector-ref map apply)
+    [(cons assq eq? eqv? equal? vector-ref map apply append quotient list-tail)
      (if (= (length args) 2)
          (case prim-proc
            [(cons) (cons (1st args) (2nd args))]
@@ -409,7 +409,10 @@
            [(eq?) (eq? (1st args) (2nd args))]
            [(eqv?) (eqv? (1st args) (2nd args))]
            [(equal?) (equal? (1st args) (2nd args))]
-           [(vector-ref) (vector-ref (1st args) (2nd args))])
+           [(vector-ref) (vector-ref (1st args) (2nd args))]
+           [(append) (append (1st args) (2nd args))]
+           [(quotient) (quotient (1st args) (2nd args))]
+           [(list-tail) (list-tail (1st args) (2nd args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 2 arguments but got ~s." prim-proc (length args)))]
     [(vector-set!) (if (= (length args) 3) (vector-set! (1st args) (2nd args) (3rd args)) (error 'apply-prim-proc "Exception in ~s: Expected 3 arguments but got ~s." prim-proc (length args)))]
     [else (error 'apply-prim-proc 
