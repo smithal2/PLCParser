@@ -72,8 +72,10 @@
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
   [letrec-exp 
-   (assignment letBasicAssignmentType?)
-   (bodies (list-of? expression?))]
+   (proc-names (list-of? symbol?))
+   (idss (list-of? (list-of? symbol?)))
+   (bodiess (list-of? (list-of? expression?)))
+   (letrec-bodies (list-of? expression?))]
   [let-exp 
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
@@ -113,7 +115,12 @@
   [extended-env-record
    (syms (list-of? symbol?))
    (vals (list-of? scheme-value?))
-   (env environment?)])
+   (env environment?)]
+  [recursively-extended-env-record
+   (proc-names (list-of? symbol?))
+   (idss (list-of? (list-of? symbol?)))
+   (bodiess (list-of? (list-of? expression?)))
+   (old-env environment?)])
 
 
 ; datatype for procedures.  At first there is only one
@@ -164,6 +171,13 @@
            [(let let* letrec) (if (and (equal? 'let (1st datum)) (symbol? (2nd datum)) (list? (3rd datum))) (let-named-exp (2nd datum) (map (lambda (assign) (list (var-exp (car assign)) (parse-exp (cadr assign)))) (3rd datum)) (map parse-exp (cdr (cdr (cdr datum))))) (if (letBasicAssignment? (2nd datum)) ((case
                                                                          (1st datum) ((let) (if (symbol? (2nd datum)) let-named-exp let-exp)) ((let*) letstar-exp)
                                                                          ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum)))]
+           [(let let*) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (let-named-exp (2nd datum) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (3rd datum)) (map parse-exp (cdddr datum))))]
+           [(letrec) (if (letBasicAssignment? (2nd datum)) (letrec-exp
+                                                            (map car (2nd datum))
+                                                            (map cadadr (2nd datum))
+                                                            (map (lambda (bodies) (map parse-exp (cddadr bodies))) (2nd datum))
+                                                            (map parse-exp (cddr datum)))
+                         (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
@@ -191,6 +205,9 @@
 (define (extend-env syms vals env)
   (extended-env-record syms vals env))
 
+(define (extend-env-recursively proc-names idss bodiess old-env)
+  (recursively-extended-env-record proc-names idss bodiess old-env))
+
 (define (list-find-position sym los)
   (let loop ([los los] [pos 0])
     (cond [(null? los) #f]
@@ -205,7 +222,14 @@
                          (let ((pos (list-find-position sym syms)))
                            (if (number? pos)
                                (list-ref vals pos)
-                               (apply-env env sym)))]))
+                               (apply-env env sym)))]
+    [recursively-extended-env-record (proc-names idss bodiess old-env)
+                                   (let ([pos (list-find-position sym proc-names)])
+                                     (if (number? pos)
+                                         (closure (list-ref idss pos)
+                                                  (list-ref bodiess pos)
+                                                  env)
+                                         (apply-env old-env sym)))]))
 
 
 ;-----------------------+
@@ -220,11 +244,11 @@
           [var-exp (symbol) exp] ;; do nothing
           [lit-exp (literal) exp] ;; do nothing
           [lambda-exp (id bodies) (lambda-exp id (map syntax-expand bodies))]
-          [letrec-exp (assignment bodies) (letrec-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [letrec-exp (proc-names idss bodiess letrec-bodies) (letrec-exp proc-names idss (map (lambda (bodies) (map syntax-expand bodies)) bodiess) (map syntax-expand letrec-bodies))]
           [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
-          [let-named-exp (name assignment bodies) (let-named-exp name (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
+          [let-named-exp (name assignment bodies) (letrec-exp (list name) (list (map car assignment)) (list (map parse-exp bodies)) (list (app-exp (var-exp name) (map (lambda (item) (parse-exp (cadr item))) assignment))))]
           [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
-          [set-exp (id value) exp]
+          [set-exp (id value) (set-exp id (syntax-expand value))]
           [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
           [and-exp (exps)
                    (cond [(null? exps) (lit-exp #t)]
@@ -245,7 +269,8 @@
           [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
           [while-exp (condition exps) (while-exp (syntax-expand condition) (syntax-expand exps))]
           [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
-          [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))])))
+          [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))]
+          [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))])))
 
 ;---------------------------------------+
 ;                                       |
@@ -292,6 +317,9 @@
     [let-named-exp (name assignment bodies)
                    (eval-exp (car bodies) (extend-env (append (list (cadr (car (car assignment)))) (list name) ) (append (list (cadr (cadr (car bodies)))) (list bodies)) env))] ;not final
     [letrec-exp (id bodies) (eval-exp (letrec-exp id bodies) env)]
+    [letrec-exp (proc-names idss bodiess letrec-bodies)
+                (car (reverse (map (lambda (letrec-body)
+                                     (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)))]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
@@ -391,6 +419,7 @@
            [(map) (our-map (1st args) (2nd args))]
            [(assq) (assq (1st args) (2nd args))]
            [(eq?) (eq? (1st args) (2nd args))]
+           [(eqv?) (eqv? (1st args) (2nd args))]
            [(equal?) (equal? (1st args) (2nd args))]
            [(vector-ref) (vector-ref (1st args) (2nd args))])
          (error 'apply-prim-proc "Exception in ~s: Expected 2 arguments but got ~s." prim-proc (length args)))]
