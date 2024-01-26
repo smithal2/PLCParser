@@ -1,13 +1,7 @@
 #lang racket
 
 (require "../chez-init.rkt")
-(provide eval-one-exp y2 advanced-letrec)
-
-(define (y2 which f1 f2) "nyi")
-(define-syntax (advanced-letrec stx)
-  (syntax-case stx ()
-    [(advanced-letrec ((fun-name fun-body) ...) letrec-body)
-     #'(error "nyi")]))
+(provide eval-one-exp reset-global-env)
 
 ;-------------------+
 ;                   |
@@ -187,9 +181,6 @@
 ;                   |
 ;-------------------+
 
-
-
-
 ; Environment definitions for CSSE 304 Scheme interpreter.  
 ; Based on EoPL sections 2.2 and 2.3
 
@@ -224,6 +215,7 @@
                                                   env)
                                          (apply-env old-env sym)))]))
 
+(define (reset-global-env) "nyi")
 
 ;-----------------------+
 ;                       |
