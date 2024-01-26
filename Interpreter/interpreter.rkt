@@ -79,10 +79,6 @@
   [let-exp 
    (assignment letBasicAssignmentType?)
    (bodies (list-of? expression?))]
-  [let-named-exp
-   (name symbol?)
-   (assignment letBasicAssignmentType?)
-   (bodies (list-of? expression?))]
   [if-exp
    (condition expression?)
    (true expression?)
@@ -168,10 +164,7 @@
                                                  [(pair? (2nd datum)) (lambda-improper-exp (2nd datum) (map parse-exp (cddr datum)))]
                                                  [else (error 'parse-exp "improper format for arguments: ~s" datum)])
                          (error 'parse-exp "not enough bodies in lambda exp: ~s" datum))]
-           [(let let* letrec) (if (and (equal? 'let (1st datum)) (symbol? (2nd datum)) (list? (3rd datum))) (let-named-exp (2nd datum) (map (lambda (assign) (list (var-exp (car assign)) (parse-exp (cadr assign)))) (3rd datum)) (map parse-exp (cdr (cdr (cdr datum))))) (if (letBasicAssignment? (2nd datum)) ((case
-                                                                         (1st datum) ((let) (if (symbol? (2nd datum)) let-named-exp let-exp)) ((let*) letstar-exp)
-                                                                         ((letrec) letrec-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (error 'parse-exp "variable assignment is wrong: ~s" datum)))]
-           [(let let*) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (let-named-exp (2nd datum) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (3rd datum)) (map parse-exp (cdddr datum))))]
+           [(let let*) (if (letBasicAssignment? (2nd datum)) ((case (1st datum) ((let) let-exp) ((let*) letstar-exp)) (map (lambda (x) (list (parse-exp (car x)) (parse-exp (cadr x)))) (2nd datum)) (map parse-exp (cddr datum))) (letrec-exp (list (2nd datum)) (list (map car (3rd datum))) (list (map parse-exp (cdddr datum))) (list (app-exp (var-exp (2nd datum)) (map (lambda (item) (parse-exp (cadr item))) (3rd datum))))))]
            [(letrec) (if (letBasicAssignment? (2nd datum)) (letrec-exp
                                                             (map car (2nd datum))
                                                             (map cadadr (2nd datum))
@@ -246,7 +239,6 @@
           [lambda-exp (id bodies) (lambda-exp id (map syntax-expand bodies))]
           [letrec-exp (proc-names idss bodiess letrec-bodies) (letrec-exp proc-names idss (map (lambda (bodies) (map syntax-expand bodies)) bodiess) (map syntax-expand letrec-bodies))]
           [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
-          [let-named-exp (name assignment bodies) (letrec-exp (list name) (list (map car assignment)) (list (map parse-exp bodies)) (list (app-exp (var-exp name) (map (lambda (item) (parse-exp (cadr item))) assignment))))]
           [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
           [set-exp (id value) (set-exp id (syntax-expand value))]
           [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
