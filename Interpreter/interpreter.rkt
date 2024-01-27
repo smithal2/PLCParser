@@ -191,9 +191,6 @@
 ;                   |
 ;-------------------+
 
-
-
-
 ; Environment definitions for CSSE 304 Scheme interpreter.  
 ; Based on EoPL sections 2.2 and 2.3
 
@@ -266,6 +263,7 @@
                                                   env)
                                          (apply-env old-env sym)))]))
 
+(define (reset-global-env) "nyi")
 
 ;-----------------------+
 ;                       |
@@ -344,13 +342,13 @@
                          [syms null]
                          [vals null])
                (if (null? assignment)
-                   (car (reverse (map (lambda (body) (eval-exp body (extended-env-record syms vals env))) bodies)))
+                   (car (reverse (map (lambda (body) (eval-exp body (extendeded-env-record-record syms vals env))) bodies)))
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
     [letrec-exp (proc-names idss bodiess letrec-bodies)
                 (car (reverse (map (lambda (letrec-body)
-                                     (eval-exp letrec-body (extend-env-recursively proc-names idss bodiess env))) letrec-bodies)))]
+                                     (eval-exp letrec-body (recursively-extended-env-record proc-names idss bodiess env))) letrec-bodies)))]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
@@ -377,28 +375,27 @@
     [prim-proc (name) (apply-prim-proc name args)]
     [closure (param bodies env)
              (car (reverse (map (lambda (body)
-                                  (eval-exp body (if (symbol? param) (extend-env (list param) (list args) env)
-                                                     (if ((list-of? symbol?) param) (extend-env param args env)
-                                                         (extend-env (flatten param) (append (take args (sub1 (length (flatten param)))) (list (drop args (sub1 (length (flatten param)))))) env))))) bodies)))]
+                                  (eval-exp body (if (symbol? param) (extended-env-record (list param) (list args) env)
+                                                     (if ((list-of? symbol?) param) (extended-env-record param args env)
+                                                         (extended-env-record (flatten param) (append (take args (sub1 (length (flatten param)))) (list (drop args (sub1 (length (flatten param)))))) env))))) bodies)))]
     [else (error 'apply-proc
                  "Attempt to apply bad procedure: ~s" 
                  proc-value)]))
 
-(define our-map
-  (lambda (proc items)
-    (if (null? items) '()
-        (append (list (apply-proc proc (list (car items)))) (our-map proc (cdr items))))))
+(define (our-map proc items)
+  (if (null? items) null
+      (cons (apply-proc proc (list (car items))) (our-map proc (cdr items)))))
 
 
 #|(define *prim-proc-names* '(+ - * / add1 sub1 cons = not zero?))|#
 (define *prim-proc-names* '(cons append void apply map assq eq? eqv? equal? vector-ref quotient list-tail vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
-  (extend-env            ; procedure names.  Recall that an environment associates
+  (extended-env-record   ; procedure names.  Recall that an environment associates
    *prim-proc-names*   ;  a value (not an expression) with an identifier.
    (map prim-proc
         *prim-proc-names*)
-   (empty-env)))
+   (empty-env-record)))
 
 ; Usually an interpreter must define each 
 ; built-in procedure individually.  We are "cheating" a little bit.
