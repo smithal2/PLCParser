@@ -1,7 +1,7 @@
 #lang racket
 
 (require "../chez-init.rkt")
-(provide eval-one-exp y2 advanced-letrec)
+(provide eval-one-exp y2 advanced-letrec reset-global-env)
 
 (define (y2 which f1 f2) "nyi")
 (define-syntax (advanced-letrec stx)
@@ -100,6 +100,9 @@
    (expressions (list-of? expression?))]
   [cond-exp
    (expression (list-of? expression?))]
+  [define-exp
+    (name symbol?)
+    (content (list-of? expression?))]
 )
 
 ;; environment type definitions
@@ -173,6 +176,7 @@
                          (error 'parse-exp "variable assignment is wrong: ~s" datum))]
            [(if) (if (and (lit-exp? (2nd datum)) (= (length datum) 3)) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (app-exp (var-exp 'void) '())) (if (and (= (length datum) 4) (lit-exp? (2nd datum))) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (4th datum))) (error 'parse-exp "wrong if statement format: ~s" datum)))]
            [(and) (and-exp (map parse-exp (cdr datum)))]
+           [(define) (if (symbol? (2nd datum)) (define-exp (2nd datum) (map parse-exp (cddr datum))) (error 'parse-exp "define needs a symbol as a name: ~s" datum))]
            [(or) (or-exp (map parse-exp (cdr datum)))]
            [(begin) (begin-exp (map parse-exp (cdr datum)))]
            [(while) (if (< 2 (length datum)) (while-exp (parse-exp (cadr datum)) (map parse-exp (cdr (cdr datum)))) (error 'parse-exp "need condition and body: ~s" datum))]
@@ -195,6 +199,13 @@
 
 (define (empty-env) (empty-env-record))
 
+(define global-env #())
+(define global-env-refs '())
+
+(define reset-global-env
+  (lambda ()
+    (set! global-env #())))
+
 (define (extend-env syms vals env)
   (extended-env-record syms vals env))
 
@@ -206,6 +217,37 @@
     (cond [(null? los) #f]
           [(eq? sym (car los)) pos]
           [else (loop (cdr los) (add1 pos))])))
+
+(define-datatype cell cell?
+  [init-cell
+   (val (list-of? expression?))]
+  [cell-ref
+   (cel cell?)]
+  [cell-set!
+   (cel cell?)
+   (val (list-of? expression?))])
+
+(define (cell-funct cel)
+  (cases cell cel
+    [init-cell (val)
+     (box val)]
+    [cell-ref (cel)
+     (unbox cel)]
+    [cell-set! (cel val)
+     (set-box! cel val)]
+    [cell? (box? cel)]))
+
+(define-datatype reference reference?
+  [init-reference
+   (index number?)
+   (name symbol?)]
+  [deref
+   (ref reference?)]
+  [set-ref!
+   (ref reference?)
+   (val expression?)])
+           
+         
 	    
 (define (apply-env env sym)
   (cases environment env
@@ -261,7 +303,8 @@
           [begin-exp (exps) (app-exp (lambda-exp '() (map syntax-expand exps)) '())]
           [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
           [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))]
-          [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))])))
+          [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))]
+          [define-exp (name expressions) (define-exp name (map syntax-expand expressions))])))
 
 ;---------------------------------------+
 ;                                       |
@@ -301,7 +344,7 @@
                          [syms null]
                          [vals null])
                (if (null? assignment)
-                   (car (reverse (map (lambda (body) (eval-exp body (extend-env syms vals env))) bodies)))
+                   (car (reverse (map (lambda (body) (eval-exp body (extended-env-record syms vals env))) bodies)))
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
@@ -314,6 +357,15 @@
                      (closure id bodies env)]
     [lambda-improper-exp (id bodies) ; (lambda (x . y) ...)
                          (closure id bodies env)]
+    [define-exp (name expressions)
+      (begin 
+        (set! global-env (list->vector (append (vector->list global-env) (init-cell expressions))))
+        (set! global-env-refs (append global-env-refs (list (init-reference (- (vector-length global-env) 1) name))))
+        (display "\nGloval Env Vlaues: \n")
+        (display global-env)
+        (display "\nGloval Env REfs: \n")
+        (display global-env-refs)
+      )]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 ;  Apply a procedure to its arguments.
