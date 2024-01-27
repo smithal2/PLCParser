@@ -263,8 +263,6 @@
                                                   env)
                                          (apply-env old-env sym)))]))
 
-(define (reset-global-env) "nyi")
-
 ;-----------------------+
 ;                       |
 ;  sec:SYNTAX EXPANSION |
@@ -342,7 +340,7 @@
                          [syms null]
                          [vals null])
                (if (null? assignment)
-                   (car (reverse (map (lambda (body) (eval-exp body (extendeded-env-record-record syms vals env))) bodies)))
+                   (car (reverse (map (lambda (body) (eval-exp body (extended-env-record syms vals env))) bodies)))
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
