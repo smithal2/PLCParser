@@ -194,25 +194,21 @@
 ; Environment definitions for CSSE 304 Scheme interpreter.  
 ; Based on EoPL sections 2.2 and 2.3
 
-(define (empty-env) (empty-env-record))
-
 (define global-env #())
 (define global-env-refs '())
 
-(define reset-global-env
-  (lambda ()
-    (set! global-env #())))
+(define (reset-global-env)
+  (begin (set! global-env #())
+         (set! global-env-refs '())))
 
 (define (extend-env syms vals env)
-  (extended-env-record syms vals env))
-
-(define (extend-env-recursively proc-names idss bodiess old-env)
-  (recursively-extended-env-record proc-names idss bodiess old-env))
+  (extended-env-record syms (map box vals) env))
 
 (define (list-find-position sym los)
   (let loop ([los los] [pos 0])
     (cond [(null? los) #f]
           [(eq? sym (car los)) pos]
+          [(reference? (car los)) (if (eq? sym (caddr (car los))) pos (loop (cdr los) (add1 pos)))]
           [else (loop (cdr los) (add1 pos))])))
 
 (define-datatype cell cell?
@@ -243,25 +239,64 @@
   [set-ref!
    (ref reference?)
    (val expression?)])
-           
-         
+
+(define get-variables
+  (lambda (lst)
+    (if (null? lst) '()
+    (append (list (caddr (car lst))) (get-variables (cdr lst))))))
+#|
+(define get-global-values
+  (lambda (global-ref ind)
+    (if (null? global-ref) '()
+    ((vector-ref global-env
+         |#
 	    
 (define (apply-env env sym)
+  (let ([result (apply-env-ref env sym)])
+    (if (box? result)
+        (unbox result)
+        result)))
+
+(define (apply-env-ref env sym)
   (cases environment env
     [empty-env-record ()
                       (error 'env "variable ~s not found." sym)]
     [extended-env-record (syms vals env)
                          (let ((pos (list-find-position sym syms)))
+                           ;(begin (display (append syms (get-variables global-env-refs)))
                            (if (number? pos)
                                (list-ref vals pos)
-                               (apply-env env sym)))]
+                           (if (number? (list-find-position sym global-env-refs))
+                               (eval-exp (caadr (vector-ref global-env (list-find-position sym global-env-refs))) env)
+                               (apply-env-ref env sym))))]
     [recursively-extended-env-record (proc-names idss bodiess old-env)
                                    (let ([pos (list-find-position sym proc-names)])
                                      (if (number? pos)
                                          (closure (list-ref idss pos)
                                                   (list-ref bodiess pos)
                                                   env)
-                                         (apply-env old-env sym)))]))
+                                         (apply-env-ref old-env sym)))]))
+
+(define (set-env! env sym val)
+  (cases environment env
+    [empty-env-record ()
+                      (error 'env "variable ~s not found." sym)]
+    [extended-env-record (syms vals env)
+                         (let ([pos (list-find-position sym syms)]
+                               [global-pos (list-find-position sym global-env-refs)])
+                           ;(begin (display (append syms (get-variables global-env-refs)))
+                           (if (number? pos)
+                               (set-box! (list-ref vals pos) val)
+                               (if (number? global-pos)
+                                   (eval-exp (caadr (vector-ref global-env global-pos)) env)
+                                   (set-env! env sym val))))]
+    [recursively-extended-env-record (proc-names idss bodiess old-env)
+                                   (let ([pos (list-find-position sym proc-names)])
+                                     (if (number? pos)
+                                         (closure (list-ref idss pos)
+                                                  (list-ref bodiess pos)
+                                                  env)
+                                         (set-env! old-env sym val)))]))
 
 ;-----------------------+
 ;                       |
@@ -353,9 +388,15 @@
                      (closure id bodies env)]
     [lambda-improper-exp (id bodies) ; (lambda (x . y) ...)
                          (closure id bodies env)]
+    [set-exp (id value)
+             (if (number? (list-find-position (cadr id) global-env-refs))
+                 (vector-set! global-env (list-find-position (cadr id) global-env-refs) (init-cell (list value)))
+                 (set-env! env (2nd id) value))]
     [define-exp (name expressions)
       (begin 
-        (set! global-env (list->vector (append (vector->list global-env) (init-cell expressions))))
+        (set! global-env (list->vector (append (vector->list global-env) (list (init-cell expressions)))))
+        (display "\nGloval Env name: \n")
+        (display name)
         (set! global-env-refs (append global-env-refs (list (init-reference (- (vector-length global-env) 1) name))))
         (display "\nGloval Env Vlaues: \n")
         (display global-env)
