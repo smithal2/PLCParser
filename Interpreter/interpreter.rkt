@@ -262,13 +262,14 @@
     [empty-env-record ()
                       (error 'env "variable ~s not found." sym)]
     [extended-env-record (syms vals env)
-                         (let ((pos (list-find-position sym syms)))
+                         (let ([pos (list-find-position sym syms)]
+                               [global-pos (list-find-position sym global-env-refs)])
                            ;(begin (display (append syms (get-variables global-env-refs)))
                            (if (number? pos)
                                (list-ref vals pos)
-                           (if (number? (list-find-position sym global-env-refs))
-                               (eval-exp (caadr (vector-ref global-env (list-find-position sym global-env-refs))) env)
-                               (apply-env-ref env sym))))]
+                               (if (number? global-pos)
+                                   (eval-exp (caadr (vector-ref global-env global-pos)) env)
+                                   (apply-env-ref env sym))))]
     [recursively-extended-env-record (proc-names idss bodiess old-env)
                                    (let ([pos (list-find-position sym proc-names)])
                                      (if (number? pos)
@@ -277,25 +278,22 @@
                                                   env)
                                          (apply-env-ref old-env sym)))]))
 
-(define (set-env! envi sym val)
-  (cases environment envi
+(define (set-env! env sym val)
+  (cases environment env
     [empty-env-record ()
                       (error 'env "variable ~s not found." sym)]
     [extended-env-record (syms vals env)
                          (let ([pos (list-find-position sym syms)]
                                [global-pos (list-find-position sym global-env-refs)])
-                           ;(begin (display (append syms (get-variables global-env-refs)))
                            (if (number? pos)
                                (set-box! (list-ref vals pos) val)
-                               (if (number? global-pos)
-                                   (eval-exp (caadr (vector-ref global-env global-pos)) env)
-                                   (set-env! env sym val))))]
+                               (set-env! env sym val)))]
     [recursively-extended-env-record (proc-names idss bodiess old-env)
                                    (let ([pos (list-find-position sym proc-names)])
                                      (if (number? pos)
                                          (closure (list-ref idss pos)
                                                   (list-ref bodiess pos)
-                                                  envi)
+                                                  env)
                                          (set-env! old-env sym val)))]))
 
 ;-----------------------+
