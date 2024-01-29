@@ -277,8 +277,8 @@
                                                   env)
                                          (apply-env-ref old-env sym)))]))
 
-(define (set-env! env sym val)
-  (cases environment env
+(define (set-env! envi sym val)
+  (cases environment envi
     [empty-env-record ()
                       (error 'env "variable ~s not found." sym)]
     [extended-env-record (syms vals env)
@@ -295,7 +295,7 @@
                                      (if (number? pos)
                                          (closure (list-ref idss pos)
                                                   (list-ref bodiess pos)
-                                                  env)
+                                                  envi)
                                          (set-env! old-env sym val)))]))
 
 ;-----------------------+
@@ -375,7 +375,8 @@
                          [syms null]
                          [vals null])
                (if (null? assignment)
-                   (car (reverse (map (lambda (body) (eval-exp body (extended-env-record syms vals env))) bodies)))
+                   (let ([new-env (extend-env syms vals env)])
+                     (car (reverse (map (lambda (body) (eval-exp body new-env)) bodies))))
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
                      (cons (eval-exp (cadar assignment) env) vals))))]
@@ -391,7 +392,7 @@
     [set-exp (id value)
              (if (number? (list-find-position (cadr id) global-env-refs))
                  (vector-set! global-env (list-find-position (cadr id) global-env-refs) (init-cell (list value)))
-                 (set-env! env (2nd id) value))]
+                 (set-env! env (2nd id) (eval-exp value env)))]
     [define-exp (name expressions)
       (begin 
         (set! global-env (list->vector (append (vector->list global-env) (list (init-cell expressions)))))
@@ -413,10 +414,10 @@
   (cases proc-val proc-value
     [prim-proc (name) (apply-prim-proc name args)]
     [closure (param bodies env)
-             (car (reverse (map (lambda (body)
-                                  (eval-exp body (if (symbol? param) (extended-env-record (list param) (list args) env)
-                                                     (if ((list-of? symbol?) param) (extended-env-record param args env)
-                                                         (extended-env-record (flatten param) (append (take args (sub1 (length (flatten param)))) (list (drop args (sub1 (length (flatten param)))))) env))))) bodies)))]
+             (let ([new-env (if (symbol? param) (extend-env (list param) (list args) env)
+                                (if ((list-of? symbol?) param) (extend-env param args env)
+                                    (extend-env (flatten param) (append (take args (sub1 (length (flatten param)))) (list (drop args (sub1 (length (flatten param)))))) env)))])
+               (car (reverse (map (lambda (body) (eval-exp body new-env)) bodies))))]
     [else (error 'apply-proc
                  "Attempt to apply bad procedure: ~s" 
                  proc-value)]))
@@ -430,7 +431,7 @@
 (define *prim-proc-names* '(cons append void apply map assq eq? eqv? equal? vector-ref quotient list-tail vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env         ; for now, our initial global environment only contains 
-  (extended-env-record   ; procedure names.  Recall that an environment associates
+  (extend-env   ; procedure names.  Recall that an environment associates
    *prim-proc-names*   ;  a value (not an expression) with an identifier.
    (map prim-proc
         *prim-proc-names*)
