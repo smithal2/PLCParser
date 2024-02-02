@@ -228,12 +228,7 @@
                                (set-box! (list-ref vals pos) val)
                                (set-env! env sym val)))]
     [recursively-extended-env-record (proc-names idss bodiess old-env)
-                                   (let ([pos (list-find-position sym proc-names)])
-                                     (if (number? pos)
-                                         (closure (list-ref idss pos)
-                                                  (list-ref bodiess pos)
-                                                  env)
-                                         (set-env! old-env sym val)))]))
+                                     (set-env! old-env sym val)]))
 
 (define (reset-global-env)
   (begin (set! global-env-ref null)
@@ -332,8 +327,8 @@
     [define-exp (name value)
       (if (member name (2nd init-env))
           (set-env! env name (eval-exp value env))
-          (begin (set! global-env-ref (cons name global-env-ref))
-                 (set! global-env (cons (box (eval-exp value env)) global-env))))]
+          (begin (set! global-env (cons (box (eval-exp value env)) global-env))
+                 (set! global-env-ref (cons name global-env-ref))))]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 (define (apply-proc proc-value args)
