@@ -276,7 +276,7 @@
 ;---------------------------------------+
 
 (define-datatype continuation continuation? 
-  [init-k] 
+  [halt-k] 
   [list-k] ;example
   [sample-k ;example
    (prev symbol?)
@@ -286,7 +286,7 @@
 
 (define (apply-k k v)
   (cases continuation k
-    [init-k () v]
+    [halt-k () v]
     [list-k () (list v)] ;example
     [sample-k (prev k) (apply-k k (cons prev v))] ;example
     ))
@@ -299,32 +299,32 @@
 
 
 (define (top-level-eval form)
-  (eval-exp form init-env))
+  (eval-exp form init-env (halt-k)))
 
 
-(define (eval-exp exp env)
+(define (eval-exp exp env k)
   (cases expression exp
-    [lit-exp (datum) datum]
+    [lit-exp (datum) (apply-k k datum)]
     [var-exp (id) (apply-env env id)]
     [if-exp (condition true false)
-            (if (eval-exp condition env) (eval-exp true env) (eval-exp false env))]
+            (if (eval-exp condition env k) (eval-exp true env k) (eval-exp false env k))]
     [app-exp (rator rands)
-             (let ([proc-value (eval-exp rator env)]
-                   [args (map (lambda (rands) (eval-exp rands env)) rands)])
-               (apply-proc proc-value args))]
+             (let ([proc-value (eval-exp rator env k)]
+                   [args (map (lambda (rands) (eval-exp rands env k)) rands)])
+               (apply-proc proc-value args k))]
     [let-exp (assignment bodies)
              (let recur ([assignment assignment]
                          [syms null]
                          [vals null])
                (if (null? assignment)
                    (let ([new-env (extend-env syms vals env)])
-                     (last (map (lambda (body) (eval-exp body new-env)) bodies)))
+                     (last (map (lambda (body) (eval-exp body new-env k)) bodies)))
                    (recur (cdr assignment)
                      (cons (cadaar assignment) syms)
-                     (cons (eval-exp (cadar assignment) env) vals))))]
+                     (cons (eval-exp (cadar assignment) env k) vals))))]
     [letrec-exp (proc-names idss bodiess letrec-bodies)
                 (last (map (lambda (letrec-body)
-                             (eval-exp letrec-body (recursively-extended-env-record proc-names idss bodiess env))) letrec-bodies))]
+                             (eval-exp letrec-body (recursively-extended-env-record proc-names idss bodiess env) k)) letrec-bodies))]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
                 (closure id bodies env)]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
@@ -332,31 +332,29 @@
     [lambda-improper-exp (id bodies) ; (lambda (x . y) ...)
                          (closure id bodies env)]
     [set-exp (id value)
-             (set-env! env (2nd id) (eval-exp value env))]
+             (set-env! env (2nd id) (eval-exp value env k))]
     [define-exp (name value)
       (if (member name (2nd init-env))
-          (set-env! env name (eval-exp value env))
-          (begin (set! global-env (cons (box (eval-exp value env)) global-env))
+          (set-env! env name (eval-exp value env k))
+          (begin (set! global-env (cons (box (eval-exp value env k)) global-env))
                  (set! global-env-ref (cons name global-env-ref))))]
     [exit-list-exp (values)
-                   (map (lambda (value) (eval-exp value env)) values)]
+                   (map (lambda (value) (eval-exp value env k)) values)]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
-(define (apply-proc proc-value args)
+(define (apply-proc proc-value args k)
   (cases proc-val proc-value
-    [prim-proc (name) (apply-prim-proc name args)]
+    [prim-proc (name) (apply-prim-proc name args k)]
     [closure (param bodies env)
              (let ([new-env (if (symbol? param) (extend-env (list param) (list args) env)
                                 (if ((list-of? symbol?) param) (extend-env param args env)
                                     (extend-env (flatten param) (append (take args (sub1 (length (flatten param)))) (list (drop args (sub1 (length (flatten param)))))) env)))])
-               (last (map (lambda (body) (eval-exp body new-env)) bodies)))]
-    [else (error 'apply-proc
-                 "Attempt to apply bad procedure: ~s" 
-                 proc-value)]))
+               (last (map (lambda (body) (eval-exp body new-env k)) bodies)))]
+    [else (error 'apply-proc "Attempt to apply bad procedure: ~s" proc-value)]))
 
-(define (our-map proc items)
+(define (our-map proc items k)
   (if (null? items) null
-      (cons (apply-proc proc (list (car items))) (our-map proc (cdr items)))))
+      (cons (apply-proc proc (list (car items)) k) (our-map proc (cdr items) k))))
 
 (define *prim-proc-names* '(cons append void apply map assq eq? eqv? equal? vector-ref quotient list-tail vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
@@ -367,7 +365,7 @@
         *prim-proc-names*)
    (empty-env-record)))
 
-(define (apply-prim-proc prim-proc args)
+(define (apply-prim-proc prim-proc args k)
   (case prim-proc
     [(+ - * / = < > <= >= list vector void)
      (case prim-proc
@@ -419,8 +417,8 @@
      (if (= (length args) 2)
          (case prim-proc
            [(cons) (cons (1st args) (2nd args))]
-           [(apply) (apply-proc (1st args) (2nd args))]
-           [(map) (our-map (1st args) (2nd args))]
+           [(apply) (apply-proc (1st args) (2nd args) k)]
+           [(map) (our-map (1st args) (2nd args) k)]
            [(assq) (assq (1st args) (2nd args))]
            [(eq?) (eq? (1st args) (2nd args))]
            [(eqv?) (eqv? (1st args) (2nd args))]
