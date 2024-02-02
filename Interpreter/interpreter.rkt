@@ -1,13 +1,7 @@
 #lang racket
 
 (require "../chez-init.rkt")
-(provide eval-one-exp y2 advanced-letrec reset-global-env)
-
-(define (y2 which f1 f2) "nyi")
-(define-syntax (advanced-letrec stx)
-  (syntax-case stx ()
-    [(advanced-letrec ((fun-name fun-body) ...) letrec-body)
-     #'(error "nyi")]))
+(provide eval-one-exp reset-global-env)
 
 ;-------------------+
 ;                   |
@@ -99,15 +93,15 @@
    (expression (list-of? expression?))]
   [define-exp
     (name symbol?)
-    (body expression?)])
-
-(define (scheme-value? x) #t)
+    (body expression?)]
+  [exit-list-exp
+   (values (list-of? expression?))])
 
 (define-datatype environment environment?
   [empty-env-record]
   [extended-env-record
    (syms (list-of? symbol?))
-   (vals (list-of? scheme-value?))
+   (vals (list-of? identity))
    (env environment?)]
   [recursively-extended-env-record
    (proc-names (list-of? symbol?))
@@ -165,6 +159,7 @@
            [(while) (if (< 2 (length datum)) (while-exp (parse-exp (cadr datum)) (map parse-exp (cdr (cdr datum)))) (error 'parse-exp "need condition and body: ~s" datum))]
            [(cond) (cond-exp (map parse-exp (cdr datum)))]
            [(set!) (if (and (= (length datum) 3) (symbol? (2nd datum))) (set-exp (var-exp (2nd datum)) (parse-exp (3rd datum))) (error 'parse-exp "wrong set! statement format: ~s" datum))]
+           [(exit-list) (exit-list-exp (map parse-exp (cdr datum)))]
            [else (app-exp (parse-exp (1st datum)) (map (lambda (y) (parse-exp y)) (cdr datum)))]))]
     [else (error 'parse-exp "bad expression: ~s" datum)]))
 
@@ -271,7 +266,8 @@
     [lambda-rest-exp (id bodies) (lambda-rest-exp id (map syntax-expand bodies))]
     [lambda-improper-exp (id bodies) (lambda-improper-exp id (map syntax-expand bodies))]
     [while-exp (condition expressions) (while-exp (syntax-expand condition) (map syntax-expand expressions))]
-    [define-exp (name body) (define-exp name (syntax-expand body))]))
+    [define-exp (name body) (define-exp name (syntax-expand body))]
+    [exit-list-exp (values) (exit-list-exp (map syntax-expand values))]))
 
 ;---------------------------------------+
 ;                                       |
@@ -279,8 +275,21 @@
 ;                                       |
 ;---------------------------------------+
 
-; To be added in assignment 18a.
+(define-datatype continuation continuation? 
+  [init-k] 
+  [list-k] ;example
+  [sample-k ;example
+   (prev symbol?)
+   (k continuation?)]
+  )
 
+
+(define (apply-k k v)
+  (cases continuation k
+    [init-k () v]
+    [list-k () (list v)] ;example
+    [sample-k (prev k) (apply-k k (cons prev v))] ;example
+    ))
 
 ;-------------------+
 ;                   |
@@ -329,6 +338,8 @@
           (set-env! env name (eval-exp value env))
           (begin (set! global-env (cons (box (eval-exp value env)) global-env))
                  (set! global-env-ref (cons name global-env-ref))))]
+    [exit-list-exp (values)
+                   (map (lambda (value) (eval-exp value env)) values)]
     [else (error 'eval-exp "Bad abstract syntax: ~a" exp)]))
 
 (define (apply-proc proc-value args)
