@@ -281,6 +281,19 @@
   [sample-k ;example
    (prev symbol?)
    (k continuation?)]
+  [if-k
+   (t expression?)
+   (f expression?)
+   (env environment?)
+   (k continuation?)]
+  [app-k
+   (rands (list-of? expression?))
+   (env environment?)
+   (k continuation?)]
+  [app2-k
+   (rands (list-of? expression?))
+   (env environment?)
+   (k continuation?)]
   )
 
 
@@ -289,6 +302,12 @@
     [halt-k () v]
     [list-k () (list v)] ;example
     [sample-k (prev k) (apply-k k (cons prev v))] ;example
+    [if-k (t f env k)
+          (if v (eval-exp t env k) (eval-exp f env k))]
+    [app-k (rands env k)
+           (apply-proc v (app2-k rands env k))]
+    [app2-k (rands evn k)
+           (map (lambda (rands) v) rands)]
     ))
 
 ;-------------------+
@@ -307,11 +326,11 @@
     [lit-exp (datum) (apply-k k datum)]
     [var-exp (id) (apply-env env id)]
     [if-exp (condition true false)
+            ;(eval-exp condition env (if-k true false env k))]
             (if (eval-exp condition env k) (eval-exp true env k) (eval-exp false env k))]
     [app-exp (rator rands)
-             (let ([proc-value (eval-exp rator env k)]
-                   [args (map (lambda (rands) (eval-exp rands env k)) rands)])
-               (apply-proc proc-value args k))]
+             (eval-exp rator env (app-k rands env rands))]
+               ;(apply-proc (eval-exp rator env k) (map (lambda (rands) (eval-exp rands env k)) rands) k)]
     [let-exp (assignment bodies)
              (let recur ([assignment assignment]
                          [syms null]
