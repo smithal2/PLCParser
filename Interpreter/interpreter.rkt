@@ -78,8 +78,8 @@
    (id var-exp?)
    (value expression?)]
   [app-exp
-   (rator expression?)
-   (rand (list-of? expression?))]
+   (proc expression?)
+   (args (list-of? expression?))]
   [and-exp
    (expressions (list-of? expression?))]
   [or-exp
@@ -183,11 +183,11 @@
     (if (null? lst) null
     (append (list (caddr (car lst))) (get-variables (cdr lst))))))
 
-(define (apply-env env sym)
+(define (apply-env env sym k)
   (let ([result (apply-env-ref env sym)])
-    (if (box? result)
-        (unbox result)
-        result)))
+    (apply-k k (if (box? result)
+                   (unbox result)
+                   result))))
 
 
 (define (apply-env-ref env sym)
@@ -245,7 +245,7 @@
     [let-exp (assignment bodies) (let-exp (map (lambda (x) (cons (1st x) (list (syntax-expand (2nd x))))) assignment) (map syntax-expand bodies))]
     [if-exp (condition true false) (if-exp (syntax-expand condition) (syntax-expand true) (syntax-expand false))]
     [set-exp (id value) (set-exp id (syntax-expand value))]
-    [app-exp (rator rand) (app-exp rator (map syntax-expand rand))]
+    [app-exp (proc args) (app-exp proc (map syntax-expand args))]
     [and-exp (exps)
              (cond [(null? exps) (lit-exp #t)]
                    [(null? (cdr exps)) (syntax-expand (car exps))]
@@ -282,32 +282,34 @@
    (prev symbol?)
    (k continuation?)]
   [if-k
-   (t expression?)
-   (f expression?)
+   (true expression?)
+   (false expression?)
    (env environment?)
    (k continuation?)]
   [app-k
-   (rands (list-of? expression?))
+   (args (list-of? expression?))
    (env environment?)
    (k continuation?)]
-  [app2-k
-   (rands (list-of? expression?))
-   (env environment?)
+  [app-args-k
+   (proc proc-val?)
+   (k continuation?)]
+  [let-k
    (k continuation?)]
   )
-
 
 (define (apply-k k v)
   (cases continuation k
     [halt-k () v]
     [list-k () (list v)] ;example
     [sample-k (prev k) (apply-k k (cons prev v))] ;example
-    [if-k (t f env k)
-          (if v (eval-exp t env k) (eval-exp f env k))]
-    [app-k (rands env k)
-           (apply-proc v (app2-k rands env k))]
-    [app2-k (rands evn k)
-           (map (lambda (rands) v) rands)]
+    [if-k (true false env k)
+          (if v (eval-exp true env k) (eval-exp false env k))]
+    [app-k (args env k)
+           (k-map (lambda (arg) (eval-exp arg env k)) args null (app-args-k v k))]
+    [app-args-k (proc k)
+                (apply-proc proc v k)] ; v = eval'd args
+    [let-k (k)
+           (apply-k k (last v))]
     ))
 
 ;-------------------+
@@ -324,32 +326,25 @@
 (define (eval-exp exp env k)
   (cases expression exp
     [lit-exp (datum) (apply-k k datum)]
-    [var-exp (id) (apply-env env id)]
+    [var-exp (id) (apply-env env id k)]
     [if-exp (condition true false)
-            ;(eval-exp condition env (if-k true false env k))]
-            (if (eval-exp condition env k) (eval-exp true env k) (eval-exp false env k))]
-    [app-exp (rator rands)
-             (eval-exp rator env (app-k rands env rands))]
-               ;(apply-proc (eval-exp rator env k) (map (lambda (rands) (eval-exp rands env k)) rands) k)]
+            (eval-exp condition env (if-k true false env k))]
+    [app-exp (proc args)
+             (eval-exp proc env (app-k args env k))]
     [let-exp (assignment bodies)
-             (let recur ([assignment assignment]
-                         [syms null]
-                         [vals null])
-               (if (null? assignment)
-                   (let ([new-env (extend-env syms vals env)])
-                     (last (map (lambda (body) (eval-exp body new-env k)) bodies)))
-                   (recur (cdr assignment)
-                     (cons (cadaar assignment) syms)
-                     (cons (eval-exp (cadar assignment) env k) vals))))]
+             (k-map (lambda (body)
+                      (eval-exp body (extend-env (k-map cadar assignment null k)
+                                                 (k-map (lambda (item) (eval-exp (2nd item) env k)) assignment null k) env) k))
+                    bodies null (let-k k))]
     [letrec-exp (proc-names idss bodiess letrec-bodies)
-                (last (map (lambda (letrec-body)
-                             (eval-exp letrec-body (recursively-extended-env-record proc-names idss bodiess env) k)) letrec-bodies))]
+                (k-map (lambda (letrec-body)
+                         (eval-exp letrec-body (recursively-extended-env-record proc-names idss bodiess env) k)) letrec-bodies null (let-k k))]
     [lambda-exp (id bodies) ; (lambda (x y) ...)
-                (closure id bodies env)]
+                (apply-k k (closure id bodies env))]
     [lambda-rest-exp (id bodies) ; (lambda x ...)
-                     (closure id bodies env)]
+                     (apply-k k (closure id bodies env))]
     [lambda-improper-exp (id bodies) ; (lambda (x . y) ...)
-                         (closure id bodies env)]
+                         (apply-k k (closure id bodies env))]
     [set-exp (id value)
              (set-env! env (2nd id) (eval-exp value env k))]
     [define-exp (name value)
@@ -375,6 +370,11 @@
   (if (null? items) null
       (cons (apply-proc proc (list (car items)) k) (our-map proc (cdr items) k))))
 
+(define (k-map proc items output k)
+  (if (null? items)
+      (apply-k k output)
+      (k-map proc (cdr items) (cons (proc (car items)) output) k)))
+
 (define *prim-proc-names* '(cons append void apply map assq eq? eqv? equal? vector-ref quotient list-tail vector-set! + - * / = < > <= >= list vector add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?))
 
 (define init-env
@@ -387,50 +387,52 @@
 (define (apply-prim-proc prim-proc args k)
   (case prim-proc
     [(+ - * / = < > <= >= list vector void)
-     (case prim-proc
-       [(+) (apply + args)]
-       [(-) (apply - args)]
-       [(*) (apply * args)]
-       [(/) (apply / args)]
-       [(=) (apply = args)]
-       [(<) (apply < args)]
-       [(>) (apply > args)]
-       [(<=) (apply <= args)]
-       [(>=) (apply >= args)]
-       [(list) (apply list args)]
-       [(vector) (apply vector args)])]
-       [(void) (void)]
+     (apply-k
+      k (case prim-proc
+          [(+) (apply + args)]
+          [(-) (apply - args)]
+          [(*) (apply * args)]
+          [(/) (apply / args)]
+          [(=) (apply = args)]
+          [(<) (apply < args)]
+          [(>) (apply > args)]
+          [(<=) (apply <= args)]
+          [(>=) (apply >= args)]
+          [(list) (apply list args)]
+          [(vector) (apply vector args)]
+          [(void) (void)]))]
     [(add1 sub1 zero? not car cdr caar cadr cdar cddr caaar caadr cadar cdaar caddr cdadr cddar cdddr null? length list->vector list? pair? procedure? vector->list vector? number? symbol?)
      (if (= (length args) 1)
-         (case prim-proc
-           [(add1) (apply-k k (+ (1st args) 1))]
-           [(sub1) (apply-k k (- (1st args) 1))]
-           [(zero?) (apply-k k (zero? (1st args)))]
-           [(not) (apply-k k (not (1st args)))]
-           [(car) (apply-k k (car (1st args)))]
-           [(cdr) (apply-k k (cdr (1st args)))]
-           [(caar) (apply-k k (caar (1st args)))]
-           [(cadr) (apply-k k (cadr (1st args)))]
-           [(cdar) (apply-k k (cdar (1st args)))]
-           [(cddr) (apply-k k (cddr (1st args)))]
-           [(caaar) (apply-k k (caaar (1st args)))]
-           [(caadr) (apply-k k (caadr (1st args)))]
-           [(cadar) (apply-k k (cadar (1st args)))]
-           [(cdaar) (apply-k k (cdaar (1st args)))]
-           [(caddr) (apply-k k (caddr (1st args)))]
-           [(cdadr) (apply-k k (cdadr (1st args)))]
-           [(cddar) (apply-k k (cddar (1st args)))]
-           [(cdddr) (apply-k k (cdddr (1st args)))]
-           [(null?) (apply-k k (null? (1st args)))]
-           [(length) (apply-k k (length (1st args)))]
-           [(list->vector) (apply-k k (list->vector (1st args)))]
-           [(list?) (apply-k k (list? (1st args)))]
-           [(pair?) (apply-k k (pair? (1st args)))]
-           [(procedure?) (apply-k k (proc-val? (1st args)))]
-           [(vector->list) (apply-k k (vector->list (1st args)))]
-           [(vector?) (apply-k k (vector? (1st args)))]
-           [(number?) (apply-k k (number? (1st args)))]
-           [(symbol?) (apply-k k (symbol? (1st args)))])
+         (apply-k
+          k (case prim-proc
+              [(add1) (+ (1st args) 1)]
+              [(sub1) (- (1st args) 1)]
+              [(zero?) (zero? (1st args))]
+              [(not) (not (1st args))]
+              [(car) (car (1st args))]
+              [(cdr) (cdr (1st args))]
+              [(caar) (caar (1st args))]
+              [(cadr) (cadr (1st args))]
+              [(cdar) (cdar (1st args))]
+              [(cddr) (cddr (1st args))]
+              [(caaar) (caaar (1st args))]
+              [(caadr) (caadr (1st args))]
+              [(cadar) (cadar (1st args))]
+              [(cdaar) (cdaar (1st args))]
+              [(caddr) (caddr (1st args))]
+              [(cdadr) (cdadr (1st args))]
+              [(cddar) (cddar (1st args))]
+              [(cdddr) (cdddr (1st args))]
+              [(null?) (null? (1st args))]
+              [(length) (length (1st args))]
+              [(list->vector) (list->vector (1st args))]
+              [(list?) (list? (1st args))]
+              [(pair?) (pair? (1st args))]
+              [(procedure?) (proc-val? (1st args))]
+              [(vector->list) (vector->list (1st args))]
+              [(vector?) (vector? (1st args))]
+              [(number?) (number? (1st args))]
+              [(symbol?) (symbol? (1st args))]))
          (error 'apply-prim-proc "Exception in ~s: Expected 1 argument but got ~s." prim-proc (length args)))]
     [(cons assq eq? eqv? equal? vector-ref map apply append quotient list-tail)
      (if (= (length args) 2)
@@ -447,14 +449,14 @@
            [(quotient) (apply-k k (quotient (1st args) (2nd args)))]
            [(list-tail) (apply-k k (list-tail (1st args) (2nd args)))])
          (error 'apply-prim-proc "Exception in ~s: Expected 2 arguments but got ~s." prim-proc (length args)))]
-    [(vector-set!) (if (= (length args) 3) (vector-set! (1st args) (2nd args) (3rd args)) (error 'apply-prim-proc "Exception in ~s: Expected 3 arguments but got ~s." prim-proc (length args)))]
+    [(vector-set!) (if (= (length args) 3) (apply-k k (vector-set! (1st args) (2nd args) (3rd args))) (error 'apply-prim-proc "Exception in ~s: Expected 3 arguments but got ~s." prim-proc (length args)))]
     [else (error 'apply-prim-proc 
                  "Bad primitive procedure name: ~s" 
                  prim-proc)])) ; missing atom?, make-vector, display, newline
 
 (define (rep)
   (display "--> ")
-  (let ([answer (top-level-eval (syntax-expand (parse-exp (read))))])
+  (let ([answer (eval-one-exp (read))])
     ;; TODO: are there answers that should display differently?
     (pretty-print answer) (newline)
     (rep)))
